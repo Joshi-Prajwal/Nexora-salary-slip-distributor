@@ -10,17 +10,21 @@ import { StatusBadge } from '../../components/feedback/StatusBadge';
 import { SalarySlipDrawer } from '../../features/salary-slips/SalarySlipDrawer';
 import { useSalarySlipStore } from '../../stores/salarySlipStore';
 import { SalarySlip } from '../../types/salarySlip';
-import { FolderOpen, FileText, Eye, Trash2 } from 'lucide-react';
+import { FolderOpen, FileText, Eye, Trash2, Cpu, FileSearch } from 'lucide-react';
 
 export const SalarySlipsPage: React.FC = () => {
   const {
     slips,
     scannedFolderPath,
     isScanning,
+    isExtracting,
     lastScanSummary,
+    lastExtractionSummary,
     selectedSlip,
     fetchSalarySlips,
     scanFolder,
+    extractSlip,
+    extractAll,
     removeSlipRecord,
     setSelectedSlip,
   } = useSalarySlipStore();
@@ -36,7 +40,6 @@ export const SalarySlipsPage: React.FC = () => {
   const handleSelectFolder = async () => {
     if (typeof window !== 'undefined' && (window as any).__TAURI_INTERNALS__) {
       try {
-
         const dialogPlugin = await import('@tauri-apps/plugin-dialog');
         const selected = await dialogPlugin.open({
           directory: true,
@@ -78,29 +81,58 @@ export const SalarySlipsPage: React.FC = () => {
     }
   };
 
+  const handleExtractAll = async () => {
+    try {
+      const summary = await extractAll();
+      if (summary) {
+        setToastMessage(`Processed ${summary.processed} PDFs: ${summary.identified} identified, ${summary.partiallyIdentified} partially identified, ${summary.notIdentified} not identified.`);
+      }
+    } catch (_err) {
+      setToastMessage('Failed to extract PDF details.');
+    }
+  };
+
   const filteredSlips = slips.filter((slip) => {
     if (!search.trim()) return true;
     const q = search.toLowerCase().trim();
-    return slip.fileName.toLowerCase().includes(q) || slip.filePath.toLowerCase().includes(q) || slip.fileHash.toLowerCase().includes(q);
+    return (
+      slip.fileName.toLowerCase().includes(q) ||
+      slip.filePath.toLowerCase().includes(q) ||
+      slip.fileHash.toLowerCase().includes(q) ||
+      (slip.detectedEmployeeId && slip.detectedEmployeeId.toLowerCase().includes(q)) ||
+      (slip.detectedName && slip.detectedName.toLowerCase().includes(q)) ||
+      (slip.detectedEmail && slip.detectedEmail.toLowerCase().includes(q))
+    );
   });
 
   const columns: Column<SalarySlip>[] = [
     { key: 'fileName', header: 'File Name' },
     {
-      key: 'filePath',
-      header: 'Location',
+      key: 'detectedInfo',
+      header: 'Identified Employee',
       render: (item) => (
-        <span className="text-xs text-slate-500 font-mono block truncate max-w-xs" title={item.filePath}>
-          {item.filePath}
-        </span>
+        <div>
+          {item.detectedEmployeeId || item.detectedName ? (
+            <div>
+              <span className="font-semibold text-slate-900 block truncate max-w-xs font-mono">
+                {item.detectedEmployeeId || 'No ID'}
+              </span>
+              <span className="text-xs text-slate-500 block truncate max-w-xs">
+                {item.detectedName || item.detectedEmail || 'Unidentified'}
+              </span>
+            </div>
+          ) : (
+            <span className="text-xs text-slate-400 font-medium">Unidentified</span>
+          )}
+        </div>
       ),
     },
     {
-      key: 'fileHash',
-      header: 'SHA-256 Hash',
+      key: 'extractionMethod',
+      header: 'Extraction',
       render: (item) => (
-        <span className="text-xs text-slate-400 font-mono block truncate w-24" title={item.fileHash}>
-          {item.fileHash.substring(0, 8)}...
+        <span className="text-xs text-slate-600 font-medium">
+          {item.extractionMethod === 'TEXT_EMBEDDED' ? 'Text Embedded' : 'Not Identified'}
         </span>
       ),
     },
@@ -115,6 +147,15 @@ export const SalarySlipsPage: React.FC = () => {
       align: 'right',
       render: (item) => (
         <div className="flex items-center justify-end gap-1.5" onClick={(e) => e.stopPropagation()}>
+          <Button
+            variant="ghost"
+            size="sm"
+            icon={<FileSearch className="w-3.5 h-3.5" />}
+            isLoading={isExtracting}
+            onClick={() => extractSlip(item.id)}
+          >
+            Extract
+          </Button>
           <Button
             variant="ghost"
             size="sm"
@@ -154,16 +195,27 @@ export const SalarySlipsPage: React.FC = () => {
 
       <PageHeader
         title="Salary Slips"
-        subtitle="Scan a folder containing your salary slip PDFs."
+        subtitle="Scan a folder containing your salary slip PDFs and extract employee details."
         action={
-          <Button
-            variant="primary"
-            icon={<FolderOpen className="w-4 h-4" />}
-            isLoading={isScanning}
-            onClick={handleSelectFolder}
-          >
-            Select Folder
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              icon={<FolderOpen className="w-4 h-4" />}
+              isLoading={isScanning}
+              onClick={handleSelectFolder}
+            >
+              Select Folder
+            </Button>
+            <Button
+              variant="primary"
+              icon={<Cpu className="w-4 h-4" />}
+              isLoading={isExtracting}
+              disabled={slips.length === 0}
+              onClick={handleExtractAll}
+            >
+              Identify Salary Slips
+            </Button>
+          </div>
         }
       />
 
@@ -179,7 +231,7 @@ export const SalarySlipsPage: React.FC = () => {
         <Card noPadding>
           <div className="p-4 border-b border-slate-100 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
             <SearchInput
-              placeholder="Search by file name or location..."
+              placeholder="Search by ID, name, email, or file name..."
               value={search}
               onSearchChange={setSearch}
             />
@@ -201,6 +253,15 @@ export const SalarySlipsPage: React.FC = () => {
             </div>
           )}
 
+          {lastExtractionSummary && (
+            <div className="px-4 py-2.5 bg-emerald-50/70 border-b border-emerald-100 flex flex-wrap items-center gap-4 text-xs text-emerald-800">
+              <span>Identified: <strong className="text-emerald-900 font-bold">{lastExtractionSummary.identified}</strong></span>
+              <span>Partially Identified: <strong className="text-blue-900 font-semibold">{lastExtractionSummary.partiallyIdentified}</strong></span>
+              <span>Not Identified: <strong className="text-slate-800 font-medium">{lastExtractionSummary.notIdentified}</strong></span>
+              <span>Failed: <strong className="text-rose-800 font-semibold">{lastExtractionSummary.failed}</strong></span>
+            </div>
+          )}
+
           <Table<SalarySlip>
             columns={columns}
             data={filteredSlips}
@@ -214,7 +275,9 @@ export const SalarySlipsPage: React.FC = () => {
       {/* Salary Slip Detail Drawer */}
       <SalarySlipDrawer
         slip={selectedSlip}
+        isExtracting={isExtracting}
         onClose={() => setSelectedSlip(null)}
+        onExtractText={(id) => extractSlip(id)}
         onRemoveRecord={(id) => {
           removeSlipRecord(id);
           setToastMessage('Salary slip database record removed.');

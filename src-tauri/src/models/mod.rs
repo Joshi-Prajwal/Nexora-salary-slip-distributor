@@ -7,5 +7,5 @@ pub mod settings;
 pub use employee::{Employee, CreateEmployeeInput};
 pub use mapping::Mapping;
 pub use message_log::MessageLog;
-pub use salary_slip::{SalarySlip, ScanSummary};
+pub use salary_slip::{SalarySlip, ScanSummary, ExtractionSummary};
 pub use settings::AppSettings;

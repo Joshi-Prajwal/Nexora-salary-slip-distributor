@@ -6,13 +6,16 @@ export const StatusBadge: React.FC<{ status: string }> = ({ status }) => {
 
   const getVariantAndLabel = (s: string): { variant: 'success' | 'warning' | 'error' | 'info' | 'neutral'; label: string } => {
     switch (s) {
+      case 'IDENTIFIED':
+        return { variant: 'success', label: 'Identified' };
       case 'READY':
-        return { variant: 'success', label: 'Ready' };
       case 'CONFIRMED':
-        return { variant: 'success', label: 'Confirmed' };
+        return { variant: 'success', label: 'Ready' };
       case 'SENT':
       case 'DELIVERED':
         return { variant: 'success', label: 'Delivered' };
+      case 'PARTIALLY_IDENTIFIED':
+        return { variant: 'info', label: 'Partially identified' };
       case 'DUPLICATE':
       case 'DUPLICATE_CONTENT':
         return { variant: 'warning', label: 'Duplicate' };
@@ -27,9 +30,13 @@ export const StatusBadge: React.FC<{ status: string }> = ({ status }) => {
         return { variant: 'warning', label: 'Retrying' };
       case 'PROCESSING':
         return { variant: 'info', label: 'Processing' };
+      case 'TEXT_EXTRACTION_FAILED':
+        return { variant: 'error', label: 'Extraction failed' };
       case 'ERROR':
+        return { variant: 'error', label: 'Error' };
+      case 'NOT_IDENTIFIED':
       case 'UNMATCHED':
-        return { variant: 'neutral', label: 'Not Identified' };
+        return { variant: 'neutral', label: 'Not identified' };
       case 'REJECTED':
         return { variant: 'error', label: 'Rejected' };
       case 'FAILED':

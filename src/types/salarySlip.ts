@@ -1,6 +1,16 @@
 export type ExtractionMethod = 'NOT_IDENTIFIED' | 'TEXT_EMBEDDED' | 'OCR' | 'MANUAL';
 
-export type MatchStatus = 'UNMATCHED' | 'READY' | 'REVIEW_REQUIRED' | 'CONFIRMED' | 'REJECTED' | 'DUPLICATE_CONTENT';
+export type MatchStatus =
+  | 'UNMATCHED'
+  | 'NOT_IDENTIFIED'
+  | 'IDENTIFIED'
+  | 'PARTIALLY_IDENTIFIED'
+  | 'TEXT_EXTRACTION_FAILED'
+  | 'DUPLICATE_CONTENT'
+  | 'READY'
+  | 'REVIEW_REQUIRED'
+  | 'CONFIRMED'
+  | 'REJECTED';
 
 export interface SalarySlip {
   id: string;
@@ -28,5 +38,16 @@ export interface ScanSummary {
   unchangedCount: number;
   duplicateCount: number;
   folderPath: string;
+  slips: SalarySlip[];
+}
+
+export interface ExtractionSummary {
+  total: number;
+  processed: number;
+  identified: number;
+  partiallyIdentified: number;
+  notIdentified: number;
+  failed: number;
+  skipped: number;
   slips: SalarySlip[];
 }

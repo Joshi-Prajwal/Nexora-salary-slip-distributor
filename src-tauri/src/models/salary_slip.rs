@@ -32,3 +32,16 @@ pub struct ScanSummary {
     pub folder_path: String,
     pub slips: Vec<SalarySlip>,
 }
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ExtractionSummary {
+    pub total: usize,
+    pub processed: usize,
+    pub identified: usize,
+    pub partially_identified: usize,
+    pub not_identified: usize,
+    pub failed: usize,
+    pub skipped: usize,
+    pub slips: Vec<SalarySlip>,
+}

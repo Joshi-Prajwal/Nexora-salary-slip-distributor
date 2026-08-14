@@ -1,4 +1,4 @@
-use crate::models::{SalarySlip, ScanSummary};
+use crate::models::{SalarySlip, ScanSummary, ExtractionSummary};
 use crate::database::connection::DbState;
 use crate::services::SalarySlipService;
 use tauri::State;
@@ -18,6 +18,25 @@ pub fn get_salary_slips(state: State<'_, DbState>) -> Result<Vec<SalarySlip>, St
     let conn = state.conn.lock().map_err(|e| e.to_string())?;
     let service = SalarySlipService::new();
     service.get_all_salary_slips(&conn)
+}
+
+#[tauri::command]
+pub fn extract_salary_slip_text(
+    state: State<'_, DbState>,
+    id: String,
+) -> Result<SalarySlip, String> {
+    let conn = state.conn.lock().map_err(|e| e.to_string())?;
+    let service = SalarySlipService::new();
+    service.extract_salary_slip_text(&conn, &id)
+}
+
+#[tauri::command]
+pub fn extract_all_salary_slips(
+    state: State<'_, DbState>,
+) -> Result<ExtractionSummary, String> {
+    let mut conn = state.conn.lock().map_err(|e| e.to_string())?;
+    let service = SalarySlipService::new();
+    service.extract_all_salary_slips(&mut conn)
 }
 
 #[tauri::command]

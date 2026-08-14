@@ -55,6 +55,44 @@ impl SalarySlipRepository {
         Ok(slips)
     }
 
+    pub fn find_by_id(&self, conn: &Connection, id: &str) -> Result<Option<SalarySlip>, String> {
+        let mut stmt = conn
+            .prepare(
+                r#"
+                SELECT id, file_path, file_name, file_hash, detected_employee_id, detected_name,
+                       detected_phone, detected_email, extraction_method, extracted_text,
+                       match_confidence, match_status, duplicate_of_id, created_at, updated_at
+                FROM salary_slips
+                WHERE id = ?
+                "#,
+            )
+            .map_err(|e| e.to_string())?;
+
+        let slip = stmt
+            .query_row(params![id], |row| {
+                Ok(SalarySlip {
+                    id: row.get(0)?,
+                    file_path: row.get(1)?,
+                    file_name: row.get(2)?,
+                    file_hash: row.get(3)?,
+                    detected_employee_id: row.get(4)?,
+                    detected_name: row.get(5)?,
+                    detected_phone: row.get(6)?,
+                    detected_email: row.get(7)?,
+                    extraction_method: row.get(8)?,
+                    extracted_text: row.get(9)?,
+                    match_confidence: row.get(10)?,
+                    match_status: row.get(11)?,
+                    duplicate_of_id: row.get(12)?,
+                    created_at: row.get(13)?,
+                    updated_at: row.get(14)?,
+                })
+            })
+            .ok();
+
+        Ok(slip)
+    }
+
     pub fn save_or_update_discovered(
         &self,
         conn: &mut Connection,
@@ -136,6 +174,50 @@ impl SalarySlipRepository {
 
         tx.commit().map_err(|e| e.to_string())?;
         Ok((new_count, updated_count, unchanged_count, duplicate_count))
+    }
+
+    pub fn update_extraction_result(
+        &self,
+        conn: &Connection,
+        id: &str,
+        extracted_text: Option<&str>,
+        detected_emp_id: Option<&str>,
+        detected_name: Option<&str>,
+        detected_phone: Option<&str>,
+        detected_email: Option<&str>,
+        extraction_method: &str,
+        match_status: &str,
+    ) -> Result<bool, String> {
+        let now = now_timestamp();
+        let rows = conn
+            .execute(
+                r#"
+                UPDATE salary_slips
+                SET extracted_text = ?,
+                    detected_employee_id = ?,
+                    detected_name = ?,
+                    detected_phone = ?,
+                    detected_email = ?,
+                    extraction_method = ?,
+                    match_status = ?,
+                    updated_at = ?
+                WHERE id = ?
+                "#,
+                params![
+                    extracted_text,
+                    detected_emp_id,
+                    detected_name,
+                    detected_phone,
+                    detected_email,
+                    extraction_method,
+                    match_status,
+                    now,
+                    id
+                ],
+            )
+            .map_err(|e| e.to_string())?;
+
+        Ok(rows > 0)
     }
 
     pub fn remove_record_by_id(&self, conn: &Connection, id: &str) -> Result<bool, String> {

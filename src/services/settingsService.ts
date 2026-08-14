@@ -7,22 +7,23 @@ export const settingsService = {
   async getSettings(): Promise<AppSettings> {
     return {
       id: 'settings-default',
-      companyName: 'Acme Corporation',
+      companyName: '',
       emailConfig: {
         provider: 'smtp',
-        host: 'smtp.example.com',
+        host: '',
         port: 587,
-        username: 'user@example.com',
-        fromAddress: 'hr@example.com',
-        fromName: 'Company HR',
+        username: '',
+        password: '',
+        fromAddress: '',
+        fromName: '',
         useTls: true,
         enabled: true,
       },
       whatsappConfig: {
         provider: 'official_cloud_api',
-        apiUrl: 'https://graph.facebook.com/v18.0',
-        apiToken: 'placeholder_token',
-        phoneNumberId: 'placeholder_id',
+        apiUrl: '',
+        apiToken: '',
+        phoneNumberId: '',
         enabled: false,
       },
       templateConfig: {
@@ -37,8 +38,7 @@ export const settingsService = {
     };
   },
 
-  async saveSettings(settings: Partial<AppSettings>): Promise<boolean> {
-    console.log('[Phase 0 Scaffold] Save settings:', settings);
+  async saveSettings(_settings: Partial<AppSettings>): Promise<boolean> {
     return true;
   },
 };

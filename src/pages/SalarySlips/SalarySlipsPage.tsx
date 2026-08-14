@@ -14,7 +14,7 @@ export const SalarySlipsPage: React.FC = () => {
   const { slips, scanFolder, isScanning, scannedFolderPath } = useSalarySlipStore();
 
   const handleSelectFolder = () => {
-    scanFolder('C:/SalarySlips/Jan2026');
+    scanFolder('');
   };
 
   const columns: Column<SalarySlip>[] = [
@@ -29,7 +29,7 @@ export const SalarySlipsPage: React.FC = () => {
         </div>
       ),
     },
-    { key: 'extractionMethod', header: 'Extraction Method' },
+    { key: 'extractionMethod', header: 'Identification' },
     {
       key: 'matchStatus',
       header: 'Status',
@@ -57,8 +57,8 @@ export const SalarySlipsPage: React.FC = () => {
       {slips.length === 0 ? (
         <EmptyState
           icon={<FileText className="w-6 h-6 text-slate-400" />}
-          title="Select your salary slip folder"
-          description="Nexora will scan PDF files from the selected folder and identify the employee information."
+          title="No salary slips found"
+          description="Select a folder containing salary slip files to get started."
           actionLabel="Select Folder"
           onAction={handleSelectFolder}
         />

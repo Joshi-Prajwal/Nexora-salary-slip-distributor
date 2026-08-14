@@ -54,7 +54,7 @@ export const EmployeesPage: React.FC = () => {
         <EmptyState
           icon={<Users className="w-6 h-6 text-slate-400" />}
           title="Import your employee list"
-          description="Upload an Excel file containing employee ID, name, phone, and email to populate your directory."
+          description="Import an Excel file containing your employee details to get started."
           actionLabel="Import Excel"
           onAction={() => {}}
         />

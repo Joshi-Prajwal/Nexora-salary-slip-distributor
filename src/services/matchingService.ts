@@ -7,13 +7,10 @@ import { MatchStatus } from '../types/salarySlip';
  */
 export const matchingService = {
   async runMatching(): Promise<MatchingResult[]> {
-    // Phase 0 placeholder - Matching algorithm belongs to matching engine phase
-    console.log('[Phase 0 Scaffold] Run automated matching');
     return [];
   },
 
   async confirmMatch(salarySlipId: string, employeeId: string): Promise<MatchingResult> {
-    console.log(`[Phase 0 Scaffold] Confirm match: slip ${salarySlipId} -> employee ${employeeId}`);
     return {
       salarySlipId,
       candidateEmployeeId: employeeId,
@@ -25,7 +22,6 @@ export const matchingService = {
   },
 
   async rejectMatch(salarySlipId: string): Promise<MatchingResult> {
-    console.log(`[Phase 0 Scaffold] Reject match for slip ${salarySlipId}`);
     return {
       salarySlipId,
       matchMethod: 'MANUAL_REVIEW',

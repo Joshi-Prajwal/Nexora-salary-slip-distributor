@@ -4,10 +4,11 @@ import { Card } from '../../components/common/Card';
 import { Table, Column } from '../../components/common/Table';
 import { Button } from '../../components/common/Button';
 import { Alert } from '../../components/common/Alert';
+import { EmptyState } from '../../components/feedback/EmptyState';
 import { StatusBadge } from '../../components/feedback/StatusBadge';
 import { useMatchingStore } from '../../stores/matchingStore';
 import { formatConfidence } from '../../utils/formatting/formatter';
-import { CheckCircle2, XCircle, ShieldCheck } from 'lucide-react';
+import { CheckCircle2, XCircle, ShieldCheck, CheckSquare } from 'lucide-react';
 
 interface ReviewItem {
   id: string;
@@ -20,28 +21,17 @@ interface ReviewItem {
 }
 
 export const MatchingPage: React.FC = () => {
-  const { confirmMatch, rejectMatch } = useMatchingStore();
+  const { matches, confirmMatch, rejectMatch } = useMatchingStore();
 
-  const mockReviewItems: ReviewItem[] = [
-    {
-      id: 'rev-1',
-      salarySlipName: 'EMP001_Jan_2026.pdf',
-      employeeName: 'John Doe',
-      employeeId: 'EMP001',
-      matchSignal: 'Exact Employee ID',
-      confidence: 0.98,
-      status: 'READY',
-    },
-    {
-      id: 'rev-2',
-      salarySlipName: 'Scanned_Slip_002.pdf',
-      employeeName: 'Jane Smith',
-      employeeId: 'EMP002',
-      matchSignal: 'Name similarity match',
-      confidence: 0.65,
-      status: 'NEEDS_REVIEW',
-    },
-  ];
+  const reviewItems: ReviewItem[] = matches.map((m) => ({
+    id: m.salarySlipId,
+    salarySlipName: m.salarySlipId,
+    employeeName: m.candidateEmployeeId || 'Unidentified',
+    employeeId: m.candidateEmployeeId || '-',
+    matchSignal: m.matchMethod,
+    confidence: m.confidence,
+    status: m.status,
+  }));
 
   const columns: Column<ReviewItem>[] = [
     { key: 'salarySlipName', header: 'Salary Slip File' },
@@ -50,12 +40,12 @@ export const MatchingPage: React.FC = () => {
       header: 'Matched Employee',
       render: (item) => (
         <div>
-          <span className="font-medium">{item.employeeName}</span>
+          <span className="font-medium text-slate-900">{item.employeeName}</span>
           <span className="text-xs text-slate-400 block">{item.employeeId}</span>
         </div>
       ),
     },
-    { key: 'matchSignal', header: 'Match Signal' },
+    { key: 'matchSignal', header: 'Match Method' },
     {
       key: 'confidence',
       header: 'Confidence',
@@ -112,27 +102,35 @@ export const MatchingPage: React.FC = () => {
         subtitle="Confirm that each salary slip belongs to the correct employee before sending."
       />
 
-      <Alert type="info" title="Verification Security Standard">
+      <Alert type="info" title="Privacy reminder">
         <div className="flex items-center gap-2">
           <ShieldCheck className="w-4 h-4 text-sky-600 shrink-0" />
           <span>
-            Salary slips contain confidential payroll information. Ambiguous matches require manual confirmation before they can be sent.
+            Salary slips contain confidential employee information. Review details carefully before approving a delivery.
           </span>
         </div>
       </Alert>
 
-      <Card noPadding>
-        <div className="p-4 border-b border-slate-100 flex items-center justify-between">
-          <span className="text-xs font-semibold text-slate-700">Salary Slip Matching Queue</span>
-          <span className="text-xs text-slate-500">1 item requires attention</span>
-        </div>
-        <Table<ReviewItem>
-          columns={columns}
-          data={mockReviewItems}
-          keyExtractor={(item) => item.id}
-          emptyMessage="No salary slips pending review."
+      {reviewItems.length === 0 ? (
+        <EmptyState
+          icon={<CheckSquare className="w-6 h-6 text-slate-400" />}
+          title="Nothing needs review yet"
+          description="Salary slips requiring confirmation will appear here."
         />
-      </Card>
+      ) : (
+        <Card noPadding>
+          <div className="p-4 border-b border-slate-100 flex items-center justify-between">
+            <span className="text-xs font-semibold text-slate-700">Salary Slip Review Queue</span>
+            <span className="text-xs text-slate-500">{reviewItems.length} items require attention</span>
+          </div>
+          <Table<ReviewItem>
+            columns={columns}
+            data={reviewItems}
+            keyExtractor={(item) => item.id}
+            emptyMessage="Nothing needs review yet."
+          />
+        </Card>
+      )}
     </div>
   );
 };

@@ -1,0 +1,22 @@
+[
+  {
+    "id": "synthetic-emp-001",
+    "employeeId": "EMP1001",
+    "name": "Alex Johnson",
+    "phone": "+15550192834",
+    "whatsappNumber": "+15550192834",
+    "email": "alex.johnson@example-corp.com",
+    "department": "Engineering",
+    "designation": "Software Engineer"
+  },
+  {
+    "id": "synthetic-emp-002",
+    "employeeId": "EMP1002",
+    "name": "Sam Taylor",
+    "phone": "+15550192835",
+    "whatsappNumber": "+15550192835",
+    "email": "sam.taylor@example-corp.com",
+    "department": "Human Resources",
+    "designation": "HR Specialist"
+  }
+]

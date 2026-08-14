@@ -1,0 +1,3 @@
+@echo off
+echo Building Salary Slip Distributor Production App...
+npm run build

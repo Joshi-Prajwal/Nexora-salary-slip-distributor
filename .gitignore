@@ -1,0 +1,50 @@
+# Node
+node_modules/
+dist/
+.vite/
+
+# Rust / Tauri
+src-tauri/target/
+
+# Environment / secrets
+.env
+.env.*
+!.env.example
+
+# Local databases
+*.db
+*.sqlite
+*.sqlite3
+
+# Logs
+*.log
+logs/
+
+# Employee/private data
+employees.xlsx
+employee-data/
+salary-slips/
+salary_slip/
+pdfs/
+private-data/
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# IDE
+.vscode/
+.idea/
+
+# Temporary files
+*.tmp
+*.temp
+
+# Test/runtime output
+coverage/
+test-results/
+
+# Generated installers
+*.msi
+*.exe

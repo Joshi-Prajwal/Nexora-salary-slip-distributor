@@ -31,6 +31,8 @@ pub fn run() {
             commands::get_employees,
             commands::import_employees,
             commands::scan_salary_slips,
+            commands::get_salary_slips,
+            commands::remove_salary_slip_record,
             commands::run_matching_engine,
             commands::start_bulk_send,
             commands::get_app_settings,

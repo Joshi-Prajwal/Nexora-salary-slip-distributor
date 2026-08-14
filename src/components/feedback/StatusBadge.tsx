@@ -13,6 +13,9 @@ export const StatusBadge: React.FC<{ status: string }> = ({ status }) => {
       case 'SENT':
       case 'DELIVERED':
         return { variant: 'success', label: 'Delivered' };
+      case 'DUPLICATE':
+      case 'DUPLICATE_CONTENT':
+        return { variant: 'warning', label: 'Duplicate' };
       case 'NEEDS_REVIEW':
       case 'REVIEW_REQUIRED':
         return { variant: 'warning', label: 'Needs review' };
@@ -26,7 +29,7 @@ export const StatusBadge: React.FC<{ status: string }> = ({ status }) => {
         return { variant: 'info', label: 'Processing' };
       case 'ERROR':
       case 'UNMATCHED':
-        return { variant: 'error', label: 'Unmatched' };
+        return { variant: 'neutral', label: 'Not Identified' };
       case 'REJECTED':
         return { variant: 'error', label: 'Rejected' };
       case 'FAILED':

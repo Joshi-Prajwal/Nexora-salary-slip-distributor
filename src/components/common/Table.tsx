@@ -13,9 +13,10 @@ interface TableProps<T> {
   keyExtractor: (item: T) => string;
   emptyMessage?: string;
   totalRecords?: number;
+  onRowClick?: (item: T) => void;
 }
 
-export function Table<T>({ columns, data, keyExtractor, emptyMessage = 'No records available.', totalRecords }: TableProps<T>) {
+export function Table<T>({ columns, data, keyExtractor, emptyMessage = 'No records available.', totalRecords, onRowClick }: TableProps<T>) {
   const getAlignClass = (align?: 'left' | 'center' | 'right') => {
     switch (align) {
       case 'center':
@@ -49,7 +50,11 @@ export function Table<T>({ columns, data, keyExtractor, emptyMessage = 'No recor
               </tr>
             ) : (
               data.map((item) => (
-                <tr key={keyExtractor(item)} className="hover:bg-slate-50/80 transition-colors">
+                <tr
+                  key={keyExtractor(item)}
+                  onClick={() => onRowClick && onRowClick(item)}
+                  className={`hover:bg-slate-50/80 transition-colors ${onRowClick ? 'cursor-pointer' : ''}`}
+                >
                   {columns.map((col) => (
                     <td key={col.key} className={`px-4 py-3 text-slate-900 ${getAlignClass(col.align)}`}>
                       {col.render ? col.render(item) : (item as Record<string, unknown>)[col.key] as React.ReactNode}

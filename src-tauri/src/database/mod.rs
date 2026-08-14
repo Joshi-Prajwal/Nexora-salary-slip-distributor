@@ -1,4 +1,4 @@
 pub mod connection;
 pub mod repositories;
 
-pub use connection::DbConnection;
+pub use connection::DbState;

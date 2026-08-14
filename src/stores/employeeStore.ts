@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { Employee } from '../types/employee';
+import { Employee, CreateEmployeeInput } from '../types/employee';
 import { employeeService } from '../services/employeeService';
 
 interface EmployeeState {
@@ -7,10 +7,11 @@ interface EmployeeState {
   isLoading: boolean;
   searchQuery: string;
   fetchEmployees: () => Promise<void>;
+  importEmployees: (inputs: CreateEmployeeInput[]) => Promise<number>;
   setSearchQuery: (query: string) => void;
 }
 
-export const useEmployeeStore = create<EmployeeState>((set) => ({
+export const useEmployeeStore = create<EmployeeState>((set, get) => ({
   employees: [],
   isLoading: false,
   searchQuery: '',
@@ -21,6 +22,17 @@ export const useEmployeeStore = create<EmployeeState>((set) => ({
       set({ employees, isLoading: false });
     } catch {
       set({ isLoading: false });
+    }
+  },
+  importEmployees: async (inputs: CreateEmployeeInput[]) => {
+    set({ isLoading: true });
+    try {
+      const result = await employeeService.importEmployeesFromExcel(inputs);
+      await get().fetchEmployees();
+      return result.importedCount;
+    } catch (err) {
+      set({ isLoading: false });
+      throw err;
     }
   },
   setSearchQuery: (searchQuery) => set({ searchQuery }),

@@ -10,7 +10,7 @@ import { StatusBadge } from '../../components/feedback/StatusBadge';
 import { SalarySlipDrawer } from '../../features/salary-slips/SalarySlipDrawer';
 import { useSalarySlipStore } from '../../stores/salarySlipStore';
 import { SalarySlip } from '../../types/salarySlip';
-import { FolderOpen, FileText, Eye, Trash2, Cpu, FileSearch } from 'lucide-react';
+import { FolderOpen, FileText, Eye, Trash2, Cpu, FileSearch, RefreshCw } from 'lucide-react';
 
 export const SalarySlipsPage: React.FC = () => {
   const {
@@ -18,13 +18,17 @@ export const SalarySlipsPage: React.FC = () => {
     scannedFolderPath,
     isScanning,
     isExtracting,
+    isOcrProcessing,
     lastScanSummary,
     lastExtractionSummary,
+    lastOcrBatchSummary,
     selectedSlip,
     fetchSalarySlips,
     scanFolder,
     extractSlip,
     extractAll,
+    runOcr,
+    runBatchOcr,
     removeSlipRecord,
     setSelectedSlip,
   } = useSalarySlipStore();
@@ -92,6 +96,17 @@ export const SalarySlipsPage: React.FC = () => {
     }
   };
 
+  const handleRunBatchOcr = async () => {
+    try {
+      const summary = await runBatchOcr();
+      if (summary) {
+        setToastMessage(`OCR processing complete for ${summary.processed} PDFs: ${summary.identified} identified, ${summary.partiallyIdentified} partially identified.`);
+      }
+    } catch (_err) {
+      setToastMessage('Failed to run OCR batch recognition.');
+    }
+  };
+
   const filteredSlips = slips.filter((slip) => {
     if (!search.trim()) return true;
     const q = search.toLowerCase().trim();
@@ -132,7 +147,11 @@ export const SalarySlipsPage: React.FC = () => {
       header: 'Extraction',
       render: (item) => (
         <span className="text-xs text-slate-600 font-medium">
-          {item.extractionMethod === 'TEXT_EMBEDDED' ? 'Text Embedded' : 'Not Identified'}
+          {item.extractionMethod === 'TEXT_EMBEDDED'
+            ? 'Text Embedded'
+            : item.extractionMethod === 'OCR'
+            ? 'OCR Image'
+            : 'Not Identified'}
         </span>
       ),
     },
@@ -155,6 +174,15 @@ export const SalarySlipsPage: React.FC = () => {
             onClick={() => extractSlip(item.id)}
           >
             Extract
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            icon={<RefreshCw className="w-3.5 h-3.5" />}
+            isLoading={isOcrProcessing}
+            onClick={() => runOcr(item.id)}
+          >
+            OCR
           </Button>
           <Button
             variant="ghost"
@@ -215,6 +243,15 @@ export const SalarySlipsPage: React.FC = () => {
             >
               Identify Salary Slips
             </Button>
+            <Button
+              variant="secondary"
+              icon={<RefreshCw className="w-4 h-4" />}
+              isLoading={isOcrProcessing}
+              disabled={slips.length === 0}
+              onClick={handleRunBatchOcr}
+            >
+              Run OCR
+            </Button>
           </div>
         }
       />
@@ -262,6 +299,15 @@ export const SalarySlipsPage: React.FC = () => {
             </div>
           )}
 
+          {lastOcrBatchSummary && (
+            <div className="px-4 py-2.5 bg-blue-50/70 border-b border-blue-100 flex flex-wrap items-center gap-4 text-xs text-blue-900">
+              <span>OCR Processed: <strong className="text-blue-900 font-bold">{lastOcrBatchSummary.processed}</strong></span>
+              <span>Identified: <strong className="text-emerald-900 font-semibold">{lastOcrBatchSummary.identified}</strong></span>
+              <span>Partially Identified: <strong className="text-blue-900 font-semibold">{lastOcrBatchSummary.partiallyIdentified}</strong></span>
+              <span>Failed: <strong className="text-rose-800 font-semibold">{lastOcrBatchSummary.failed}</strong></span>
+            </div>
+          )}
+
           <Table<SalarySlip>
             columns={columns}
             data={filteredSlips}
@@ -276,8 +322,10 @@ export const SalarySlipsPage: React.FC = () => {
       <SalarySlipDrawer
         slip={selectedSlip}
         isExtracting={isExtracting}
+        isOcrProcessing={isOcrProcessing}
         onClose={() => setSelectedSlip(null)}
         onExtractText={(id) => extractSlip(id)}
+        onRunOcr={(id) => runOcr(id)}
         onRemoveRecord={(id) => {
           removeSlipRecord(id);
           setToastMessage('Salary slip database record removed.');

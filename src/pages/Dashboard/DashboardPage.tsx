@@ -7,23 +7,38 @@ import { Button } from '../../components/common/Button';
 import { useAppStore } from '../../stores/appStore';
 import { useEmployeeStore } from '../../stores/employeeStore';
 import { useSalarySlipStore } from '../../stores/salarySlipStore';
-import { useMatchingStore } from '../../stores/matchingStore';
-import { useSendingStore } from '../../stores/sendingStore';
-import { Users, FileText, CheckSquare, Send, ArrowRight } from 'lucide-react';
+import { useDeliveryStore } from '../../stores/deliveryStore';
+import { Users, FileText, CheckSquare, ArrowRight, Send } from 'lucide-react';
 
 export const DashboardPage: React.FC = () => {
   const { setActivePage } = useAppStore();
   const { employees, fetchEmployees } = useEmployeeStore();
-  const { slips } = useSalarySlipStore();
-  const { matches } = useMatchingStore();
-  const { jobs } = useSendingStore();
+  const { slips, fetchSalarySlips } = useSalarySlipStore();
+  const { records, fetchRecords } = useDeliveryStore();
 
   useEffect(() => {
     fetchEmployees();
-  }, [fetchEmployees]);
+    fetchSalarySlips();
+    fetchRecords();
+  }, [fetchEmployees, fetchSalarySlips, fetchRecords]);
 
-  const pendingReviewCount = matches.filter((m) => !m.confirmed).length;
-  const sentCount = jobs.filter((j) => j.status === 'SENT').length;
+  const needsReviewCount = slips.filter(
+    (s) =>
+      s.matchStatus === 'POSSIBLE_MATCH' ||
+      s.matchStatus === 'CONFLICT' ||
+      s.matchStatus === 'MANUAL_REVIEW' ||
+      s.matchStatus === 'UNMATCHED'
+  ).length;
+
+  const readyToSendCount = slips.filter(
+    (s) =>
+      s.matchStatus === 'EXACT_MATCH' ||
+      s.matchStatus === 'STRONG_MATCH' ||
+      s.matchStatus === 'MANUALLY_CONFIRMED'
+  ).length;
+
+  const sentCount = records.filter((r) => r.status === 'SENT').length;
+  const failedCount = records.filter((r) => r.status === 'FAILED').length;
 
   const workflowSteps: StepItem[] = [
     {
@@ -41,13 +56,13 @@ export const DashboardPage: React.FC = () => {
     {
       id: 'review',
       title: 'Review',
-      subtitle: pendingReviewCount > 0 ? `${pendingReviewCount} need attention` : 'Nothing to review',
-      status: pendingReviewCount > 0 ? 'attention' : 'upcoming',
+      subtitle: needsReviewCount > 0 ? `${needsReviewCount} need review` : 'All matches confirmed',
+      status: needsReviewCount > 0 ? 'attention' : 'completed',
     },
     {
       id: 'send',
       title: 'Send',
-      subtitle: sentCount > 0 ? `${sentCount} sent` : 'Nothing ready to send',
+      subtitle: readyToSendCount > 0 ? `${readyToSendCount} ready to send` : 'Nothing ready to send',
       status: 'upcoming',
     },
   ];
@@ -81,19 +96,19 @@ export const DashboardPage: React.FC = () => {
           label="Salary Slips"
           value={slips.length}
           icon={<FileText className="w-5 h-5 text-slate-500" />}
-          trend={slips.length > 0 ? `${slips.length} scanned` : 'No salary slips scanned yet'}
+          trend={slips.length > 0 ? `${slips.length} registered` : 'No salary slips scanned yet'}
         />
         <StatCard
           label="Needs Review"
-          value={pendingReviewCount}
+          value={needsReviewCount}
           icon={<CheckSquare className="w-5 h-5 text-slate-500" />}
-          trend={pendingReviewCount > 0 ? `${pendingReviewCount} need review` : 'Nothing needs review'}
+          trend={needsReviewCount > 0 ? `${needsReviewCount} need review` : 'All matches confirmed'}
         />
         <StatCard
-          label="Sent"
+          label="Sent & Delivered"
           value={sentCount}
-          icon={<Send className="w-5 h-5 text-slate-500" />}
-          trend={sentCount > 0 ? `${sentCount} delivered` : 'No salary slips sent yet'}
+          icon={<Send className="w-5 h-5 text-emerald-600" />}
+          trend={failedCount > 0 ? `${failedCount} failed attempts` : `${readyToSendCount} ready to send`}
         />
       </div>
 

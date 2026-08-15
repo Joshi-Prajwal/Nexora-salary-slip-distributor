@@ -1,24 +1,29 @@
 export type CommunicationChannel = 'WHATSAPP' | 'EMAIL' | 'BOTH';
 
 export interface WhatsAppConfig {
-  provider: 'official_cloud_api' | 'meta_business';
+  provider: string;
   apiUrl: string;
-  apiToken: string;
+  apiToken?: string;
+  hasAccessToken?: boolean;
   phoneNumberId: string;
   templateName?: string;
   enabled: boolean;
+  configured?: boolean;
 }
 
 export interface EmailConfig {
-  provider: 'smtp' | 'aws_ses' | 'sendgrid';
+  provider: string;
   host: string;
   port: number;
   username: string;
   password?: string;
+  hasPassword?: boolean;
   fromAddress: string;
   fromName: string;
+  securityMode?: string;
   useTls: boolean;
   enabled: boolean;
+  configured?: boolean;
 }
 
 export interface MessageTemplateConfig {

@@ -1,4 +1,5 @@
 use serde::Serialize;
+use std::fmt;
 
 #[derive(Debug, Clone)]
 pub enum AppError {
@@ -7,9 +8,26 @@ pub enum AppError {
     ExtractionError(String),
     ValidationError(String),
     ProviderError(String),
+    ConfigurationError(String),
+    IoError(String),
 }
 
-// Custom simple enum for Phase 0 without external macros
+impl fmt::Display for AppError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            AppError::DatabaseError(msg) => write!(f, "Database error: {}", msg),
+            AppError::FileSystemError(msg) => write!(f, "File system error: {}", msg),
+            AppError::ExtractionError(msg) => write!(f, "Extraction error: {}", msg),
+            AppError::ValidationError(msg) => write!(f, "Validation error: {}", msg),
+            AppError::ProviderError(msg) => write!(f, "Provider error: {}", msg),
+            AppError::ConfigurationError(msg) => write!(f, "Configuration error: {}", msg),
+            AppError::IoError(msg) => write!(f, "IO error: {}", msg),
+        }
+    }
+}
+
+impl std::error::Error for AppError {}
+
 #[derive(Debug, Serialize)]
 pub struct SanitizedError {
     pub code: String,
@@ -35,9 +53,17 @@ impl AppError {
                 code: "VALIDATION_ERROR".into(),
                 message: msg.clone(),
             },
-            AppError::ProviderError(_) => SanitizedError {
+            AppError::ProviderError(msg) => SanitizedError {
                 code: "PROVIDER_ERROR".into(),
-                message: "External provider communication failed.".into(),
+                message: msg.clone(),
+            },
+            AppError::ConfigurationError(msg) => SanitizedError {
+                code: "CONFIG_ERROR".into(),
+                message: msg.clone(),
+            },
+            AppError::IoError(msg) => SanitizedError {
+                code: "IO_ERROR".into(),
+                message: msg.clone(),
             },
         }
     }

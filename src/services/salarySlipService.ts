@@ -1,4 +1,4 @@
-import { SalarySlip, ScanSummary, ExtractionSummary } from '../types/salarySlip';
+import { SalarySlip, ScanSummary, ExtractionSummary, OcrBatchSummary } from '../types/salarySlip';
 
 let memorySalarySlipsStore: SalarySlip[] = [];
 
@@ -16,7 +16,7 @@ async function tryTauriInvoke<T>(cmd: string, args?: Record<string, any>): Promi
 
 /**
  * Salary Slip Application Service
- * Manages PDF directory scanning, SHA-256 metadata hashing, embedded text extraction, and SQLite record persistence
+ * Manages PDF directory scanning, SHA-256 metadata hashing, embedded text extraction, OCR fallback, matching, and SQLite record persistence
  */
 export const salarySlipService = {
   async scanFolder(folderPath: string): Promise<ScanSummary> {
@@ -52,7 +52,6 @@ export const salarySlipService = {
       return tauriResult;
     }
 
-    // Web / Vitest fallback logic for testing
     const index = memorySalarySlipsStore.findIndex((s) => s.id === id);
     if (index !== -1) {
       const slip = memorySalarySlipsStore[index];
@@ -81,7 +80,6 @@ export const salarySlipService = {
       return tauriResult;
     }
 
-    // Web / Vitest fallback
     const slips = [...memorySalarySlipsStore];
     return {
       total: slips.length,
@@ -93,6 +91,147 @@ export const salarySlipService = {
       skipped: 0,
       slips,
     };
+  },
+
+  async runOcrFallback(id: string): Promise<SalarySlip | null> {
+    const tauriResult = await tryTauriInvoke<SalarySlip>('run_ocr_fallback', { id });
+    if (tauriResult !== null) {
+      return tauriResult;
+    }
+
+    const index = memorySalarySlipsStore.findIndex((s) => s.id === id);
+    if (index !== -1) {
+      const slip = memorySalarySlipsStore[index];
+      const hasPartials = !!(slip.detectedName || slip.detectedEmail || slip.detectedPhone);
+      const updated: SalarySlip = {
+        ...slip,
+        extractionMethod: 'OCR',
+        ocrConfidence: 90.0,
+        ocrProcessedAt: `${Date.now()}`,
+        matchStatus:
+          slip.matchStatus === 'DUPLICATE_CONTENT'
+            ? 'DUPLICATE_CONTENT'
+            : slip.detectedEmployeeId
+            ? 'IDENTIFIED'
+            : hasPartials
+            ? 'PARTIALLY_IDENTIFIED'
+            : 'NOT_IDENTIFIED',
+      };
+      memorySalarySlipsStore[index] = updated;
+      return updated;
+    }
+    return null;
+  },
+
+  async runBatchOcrFallback(): Promise<OcrBatchSummary> {
+    const tauriResult = await tryTauriInvoke<OcrBatchSummary>('run_batch_ocr_fallback');
+    if (tauriResult !== null) {
+      return tauriResult;
+    }
+
+    const slips = [...memorySalarySlipsStore];
+    for (let i = 0; i < slips.length; i++) {
+      if (slips[i].matchStatus === 'TEXT_EXTRACTION_FAILED' || slips[i].matchStatus === 'NOT_IDENTIFIED') {
+        const hasPartials = !!(slips[i].detectedName || slips[i].detectedEmail || slips[i].detectedPhone);
+        slips[i] = {
+          ...slips[i],
+          extractionMethod: 'OCR',
+          ocrConfidence: 90.0,
+          ocrProcessedAt: `${Date.now()}`,
+          matchStatus:
+            slips[i].matchStatus === 'DUPLICATE_CONTENT'
+              ? 'DUPLICATE_CONTENT'
+              : slips[i].detectedEmployeeId
+              ? 'IDENTIFIED'
+              : hasPartials
+              ? 'PARTIALLY_IDENTIFIED'
+              : 'NOT_IDENTIFIED',
+        };
+      }
+    }
+    return {
+      total: slips.length,
+      processed: slips.length,
+      identified: slips.filter((s) => s.matchStatus === 'IDENTIFIED').length,
+      partiallyIdentified: slips.filter((s) => s.matchStatus === 'PARTIALLY_IDENTIFIED').length,
+      notIdentified: slips.filter((s) => s.matchStatus === 'NOT_IDENTIFIED' || s.matchStatus === 'UNMATCHED').length,
+      failed: slips.filter((s) => s.matchStatus === 'TEXT_EXTRACTION_FAILED').length,
+      skipped: 0,
+      slips,
+    };
+  },
+
+  async confirmMatch(slipId: string, employeeId: string, note?: string): Promise<SalarySlip | null> {
+    const tauriResult = await tryTauriInvoke<SalarySlip>('confirm_salary_slip_match', {
+      slipId,
+      employeeId,
+      note,
+    });
+    if (tauriResult !== null) {
+      return tauriResult;
+    }
+
+    const index = memorySalarySlipsStore.findIndex((s) => s.id === slipId);
+    if (index !== -1) {
+      const updated: SalarySlip = {
+        ...memorySalarySlipsStore[index],
+        matchedEmployeeId: employeeId,
+        matchStatus: 'MANUALLY_CONFIRMED',
+        matchConfidence: 1.0,
+        reviewedAt: `${Date.now()}`,
+        reviewNote: note,
+      };
+      memorySalarySlipsStore[index] = updated;
+      return updated;
+    }
+    return null;
+  },
+
+  async rejectMatch(slipId: string, note?: string): Promise<SalarySlip | null> {
+    const tauriResult = await tryTauriInvoke<SalarySlip>('reject_salary_slip_match', {
+      slipId,
+      note,
+    });
+    if (tauriResult !== null) {
+      return tauriResult;
+    }
+
+    const index = memorySalarySlipsStore.findIndex((s) => s.id === slipId);
+    if (index !== -1) {
+      const updated: SalarySlip = {
+        ...memorySalarySlipsStore[index],
+        matchedEmployeeId: undefined,
+        matchStatus: 'MANUALLY_REJECTED',
+        matchConfidence: 0.0,
+        reviewedAt: `${Date.now()}`,
+        reviewNote: note,
+      };
+      memorySalarySlipsStore[index] = updated;
+      return updated;
+    }
+    return null;
+  },
+
+  async resetMatch(slipId: string): Promise<SalarySlip | null> {
+    const tauriResult = await tryTauriInvoke<SalarySlip>('reset_salary_slip_match', {
+      slipId,
+    });
+    if (tauriResult !== null) {
+      return tauriResult;
+    }
+
+    const index = memorySalarySlipsStore.findIndex((s) => s.id === slipId);
+    if (index !== -1) {
+      const updated: SalarySlip = {
+        ...memorySalarySlipsStore[index],
+        matchedEmployeeId: undefined,
+        matchStatus: 'UNMATCHED',
+        matchConfidence: 0.0,
+      };
+      memorySalarySlipsStore[index] = updated;
+      return updated;
+    }
+    return null;
   },
 
   async removeRecord(id: string): Promise<boolean> {

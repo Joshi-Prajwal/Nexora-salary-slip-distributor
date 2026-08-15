@@ -16,7 +16,9 @@ impl SalarySlipRepository {
                 r#"
                 SELECT id, file_path, file_name, file_hash, detected_employee_id, detected_name,
                        detected_phone, detected_email, extraction_method, extracted_text,
-                       match_confidence, match_status, duplicate_of_id, created_at, updated_at
+                       match_confidence, match_status, duplicate_of_id, ocr_confidence,
+                       ocr_processed_at, ocr_error, matched_employee_id, match_reason,
+                       matched_at, reviewed_at, reviewed_by, review_note, created_at, updated_at
                 FROM salary_slips
                 ORDER BY created_at DESC
                 "#,
@@ -39,8 +41,17 @@ impl SalarySlipRepository {
                     match_confidence: row.get(10)?,
                     match_status: row.get(11)?,
                     duplicate_of_id: row.get(12)?,
-                    created_at: row.get(13)?,
-                    updated_at: row.get(14)?,
+                    ocr_confidence: row.get(13)?,
+                    ocr_processed_at: row.get(14)?,
+                    ocr_error: row.get(15)?,
+                    matched_employee_id: row.get(16)?,
+                    match_reason: row.get(17)?,
+                    matched_at: row.get(18)?,
+                    reviewed_at: row.get(19)?,
+                    reviewed_by: row.get(20)?,
+                    review_note: row.get(21)?,
+                    created_at: row.get(22)?,
+                    updated_at: row.get(23)?,
                 })
             })
             .map_err(|e| e.to_string())?;
@@ -61,7 +72,9 @@ impl SalarySlipRepository {
                 r#"
                 SELECT id, file_path, file_name, file_hash, detected_employee_id, detected_name,
                        detected_phone, detected_email, extraction_method, extracted_text,
-                       match_confidence, match_status, duplicate_of_id, created_at, updated_at
+                       match_confidence, match_status, duplicate_of_id, ocr_confidence,
+                       ocr_processed_at, ocr_error, matched_employee_id, match_reason,
+                       matched_at, reviewed_at, reviewed_by, review_note, created_at, updated_at
                 FROM salary_slips
                 WHERE id = ?
                 "#,
@@ -84,8 +97,17 @@ impl SalarySlipRepository {
                     match_confidence: row.get(10)?,
                     match_status: row.get(11)?,
                     duplicate_of_id: row.get(12)?,
-                    created_at: row.get(13)?,
-                    updated_at: row.get(14)?,
+                    ocr_confidence: row.get(13)?,
+                    ocr_processed_at: row.get(14)?,
+                    ocr_error: row.get(15)?,
+                    matched_employee_id: row.get(16)?,
+                    match_reason: row.get(17)?,
+                    matched_at: row.get(18)?,
+                    reviewed_at: row.get(19)?,
+                    reviewed_by: row.get(20)?,
+                    review_note: row.get(21)?,
+                    created_at: row.get(22)?,
+                    updated_at: row.get(23)?,
                 })
             })
             .ok();
@@ -107,7 +129,6 @@ impl SalarySlipRepository {
         let mut duplicate_count = 0;
 
         for file in files {
-            // 1. PATH IDENTITY CHECK: Check if file_path already exists in SQLite
             let existing_path_record: Option<(String, String)> = tx
                 .query_row(
                     "SELECT id, file_hash FROM salary_slips WHERE file_path = ?",
@@ -120,7 +141,6 @@ impl SalarySlipRepository {
                 if existing_hash == file.file_hash {
                     unchanged_count += 1;
                 } else {
-                    // Content modified on disk for existing file path
                     tx.execute(
                         "UPDATE salary_slips SET file_hash = ?, file_name = ?, updated_at = ? WHERE id = ?",
                         params![file.file_hash, file.file_name, now, id],
@@ -129,7 +149,6 @@ impl SalarySlipRepository {
                     updated_count += 1;
                 }
             } else {
-                // 2. CONTENT IDENTITY CHECK: New file path, check if file_hash already exists in DB
                 let canonical_id: Option<String> = tx
                     .query_row(
                         "SELECT id FROM salary_slips WHERE file_hash = ? ORDER BY created_at ASC LIMIT 1",
@@ -141,7 +160,6 @@ impl SalarySlipRepository {
                 let id = format!("slip-{}", uuid_simple());
 
                 if let Some(canonical) = canonical_id {
-                    // Content Duplicate Discovered!
                     tx.execute(
                         r#"
                         INSERT INTO salary_slips (
@@ -155,7 +173,6 @@ impl SalarySlipRepository {
                     .map_err(|e| e.to_string())?;
                     duplicate_count += 1;
                 } else {
-                    // New Independent PDF Discovered!
                     tx.execute(
                         r#"
                         INSERT INTO salary_slips (
@@ -211,6 +228,103 @@ impl SalarySlipRepository {
                     detected_email,
                     extraction_method,
                     match_status,
+                    now,
+                    id
+                ],
+            )
+            .map_err(|e| e.to_string())?;
+
+        Ok(rows > 0)
+    }
+
+    pub fn update_ocr_result(
+        &self,
+        conn: &Connection,
+        id: &str,
+        extracted_text: Option<&str>,
+        detected_emp_id: Option<&str>,
+        detected_name: Option<&str>,
+        detected_phone: Option<&str>,
+        detected_email: Option<&str>,
+        extraction_method: &str,
+        match_status: &str,
+        ocr_confidence: Option<f64>,
+        ocr_error: Option<&str>,
+    ) -> Result<bool, String> {
+        let now = now_timestamp();
+        let rows = conn
+            .execute(
+                r#"
+                UPDATE salary_slips
+                SET extracted_text = ?,
+                    detected_employee_id = ?,
+                    detected_name = ?,
+                    detected_phone = ?,
+                    detected_email = ?,
+                    extraction_method = ?,
+                    match_status = ?,
+                    ocr_confidence = ?,
+                    ocr_processed_at = ?,
+                    ocr_error = ?,
+                    updated_at = ?
+                WHERE id = ?
+                "#,
+                params![
+                    extracted_text,
+                    detected_emp_id,
+                    detected_name,
+                    detected_phone,
+                    detected_email,
+                    extraction_method,
+                    match_status,
+                    ocr_confidence,
+                    now,
+                    ocr_error,
+                    now,
+                    id
+                ],
+            )
+            .map_err(|e| e.to_string())?;
+
+        Ok(rows > 0)
+    }
+
+    pub fn update_match_decision(
+        &self,
+        conn: &Connection,
+        id: &str,
+        matched_employee_id: Option<&str>,
+        match_status: &str,
+        match_confidence: f64,
+        match_reason: &str,
+        review_note: Option<&str>,
+        reviewed_by: Option<&str>,
+    ) -> Result<bool, String> {
+        let now = now_timestamp();
+        let rows = conn
+            .execute(
+                r#"
+                UPDATE salary_slips
+                SET matched_employee_id = ?,
+                    match_status = ?,
+                    match_confidence = ?,
+                    match_reason = ?,
+                    matched_at = ?,
+                    reviewed_at = ?,
+                    reviewed_by = ?,
+                    review_note = ?,
+                    updated_at = ?
+                WHERE id = ?
+                "#,
+                params![
+                    matched_employee_id,
+                    match_status,
+                    match_confidence,
+                    match_reason,
+                    now,
+                    now,
+                    reviewed_by,
+                    review_note,
                     now,
                     id
                 ],

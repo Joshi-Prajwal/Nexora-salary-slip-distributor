@@ -1,41 +1,63 @@
 import { create } from 'zustand';
-import { MatchingResult, MatchingFilter } from '../types/matching';
+import { MatchingFilter, MatchCandidate, BatchMatchSummary } from '../types/matching';
 import { matchingService } from '../services/matchingService';
+import { useSalarySlipStore } from './salarySlipStore';
 
 interface MatchingState {
-  matches: MatchingResult[];
   filter: MatchingFilter;
-  isProcessing: boolean;
+  isMatchingProcessing: boolean;
+  lastBatchMatchSummary: BatchMatchSummary | null;
+  candidates: Record<string, MatchCandidate[]>;
   setFilter: (filter: MatchingFilter) => void;
-  runMatching: () => Promise<void>;
-  confirmMatch: (slipId: string, empId: string) => Promise<void>;
-  rejectMatch: (slipId: string) => Promise<void>;
+  runMatching: () => Promise<BatchMatchSummary | null>;
+  fetchCandidates: (slipId: string) => Promise<MatchCandidate[]>;
+  confirmMatch: (slipId: string, employeeId: string, note?: string) => Promise<void>;
+  rejectMatch: (slipId: string, note?: string) => Promise<void>;
+  resetMatch: (slipId: string) => Promise<void>;
 }
 
 export const useMatchingStore = create<MatchingState>((set, get) => ({
-  matches: [],
   filter: {},
-  isProcessing: false,
+  isMatchingProcessing: false,
+  lastBatchMatchSummary: null,
+  candidates: {},
   setFilter: (filter) => set({ filter }),
   runMatching: async () => {
-    set({ isProcessing: true });
+    set({ isMatchingProcessing: true });
     try {
-      const matches = await matchingService.runMatching();
-      set({ matches, isProcessing: false });
+      const summary = await matchingService.runMatchingEngine();
+      await useSalarySlipStore.getState().fetchSalarySlips();
+      set({
+        lastBatchMatchSummary: summary,
+        isMatchingProcessing: false,
+      });
+      return summary;
     } catch {
-      set({ isProcessing: false });
+      set({ isMatchingProcessing: false });
+      return null;
     }
   },
-  confirmMatch: async (slipId: string, empId: string) => {
-    const updated = await matchingService.confirmMatch(slipId, empId);
-    set({
-      matches: get().matches.map((m) => (m.salarySlipId === slipId ? updated : m)),
-    });
+  fetchCandidates: async (slipId: string) => {
+    try {
+      const cand = await matchingService.getCandidates(slipId);
+      set({
+        candidates: { ...get().candidates, [slipId]: cand },
+      });
+      return cand;
+    } catch {
+      return [];
+    }
   },
-  rejectMatch: async (slipId: string) => {
-    const updated = await matchingService.rejectMatch(slipId);
-    set({
-      matches: get().matches.map((m) => (m.salarySlipId === slipId ? updated : m)),
-    });
+  confirmMatch: async (slipId: string, employeeId: string, note?: string) => {
+    await matchingService.confirmMatch(slipId, employeeId, note);
+    await useSalarySlipStore.getState().fetchSalarySlips();
+  },
+  rejectMatch: async (slipId: string, note?: string) => {
+    await matchingService.rejectMatch(slipId, note);
+    await useSalarySlipStore.getState().fetchSalarySlips();
+  },
+  resetMatch: async (slipId: string) => {
+    await matchingService.resetMatch(slipId);
+    await useSalarySlipStore.getState().fetchSalarySlips();
   },
 }));

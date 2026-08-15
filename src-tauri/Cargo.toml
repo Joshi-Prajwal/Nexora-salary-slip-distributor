@@ -19,6 +19,8 @@ sha2 = "0.10"
 walkdir = "2"
 pdf-extract = "0.7"
 regex = "1"
+image = "0.24"
+lettre = { version = "0.11", features = ["builder", "smtp-transport", "native-tls"] }
 
 [features]
 default = ["custom-protocol"]

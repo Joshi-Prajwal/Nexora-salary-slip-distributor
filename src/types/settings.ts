@@ -1,5 +1,11 @@
 import { EmailConfig, WhatsAppConfig, MessageTemplateConfig } from './messaging';
 
+export interface ConnectionTestResult {
+  success: boolean;
+  code: string;
+  message: string;
+}
+
 export interface AppSettings {
   id: string;
   companyName: string;
@@ -7,7 +13,7 @@ export interface AppSettings {
   whatsappConfig: WhatsAppConfig;
   templateConfig: MessageTemplateConfig;
   autoProcessScan: boolean;
-  minAutoMatchConfidence: number; // default e.g. 0.85
+  minAutoMatchConfidence: number;
   createdAt: string;
   updatedAt: string;
 }

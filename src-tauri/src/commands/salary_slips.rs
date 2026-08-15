@@ -1,4 +1,4 @@
-use crate::models::{SalarySlip, ScanSummary, ExtractionSummary};
+use crate::models::{SalarySlip, ScanSummary, ExtractionSummary, OcrBatchSummary};
 use crate::database::connection::DbState;
 use crate::services::SalarySlipService;
 use tauri::State;
@@ -34,9 +34,28 @@ pub fn extract_salary_slip_text(
 pub fn extract_all_salary_slips(
     state: State<'_, DbState>,
 ) -> Result<ExtractionSummary, String> {
-    let mut conn = state.conn.lock().map_err(|e| e.to_string())?;
+    let conn = state.conn.lock().map_err(|e| e.to_string())?;
     let service = SalarySlipService::new();
-    service.extract_all_salary_slips(&mut conn)
+    service.extract_all_salary_slips(&conn)
+}
+
+#[tauri::command]
+pub fn run_ocr_fallback(
+    state: State<'_, DbState>,
+    id: String,
+) -> Result<SalarySlip, String> {
+    let conn = state.conn.lock().map_err(|e| e.to_string())?;
+    let service = SalarySlipService::new();
+    service.run_ocr_fallback(&conn, &id)
+}
+
+#[tauri::command]
+pub fn run_batch_ocr_fallback(
+    state: State<'_, DbState>,
+) -> Result<OcrBatchSummary, String> {
+    let conn = state.conn.lock().map_err(|e| e.to_string())?;
+    let service = SalarySlipService::new();
+    service.run_batch_ocr_fallback(&conn)
 }
 
 #[tauri::command]

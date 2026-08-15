@@ -12,6 +12,7 @@ interface ConfirmDialogProps {
   cancelLabel?: string;
   isDestructive?: boolean;
   isLoading?: boolean;
+  children?: React.ReactNode;
 }
 
 export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
@@ -24,6 +25,7 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
   cancelLabel = 'Cancel',
   isDestructive = false,
   isLoading = false,
+  children,
 }) => {
   return (
     <Dialog
@@ -41,7 +43,10 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
         </>
       }
     >
-      <p className="text-sm text-slate-600">{message}</p>
+      <div className="space-y-2">
+        <p className="text-sm text-slate-600">{message}</p>
+        {children}
+      </div>
     </Dialog>
   );
 };

@@ -16,6 +16,15 @@ pub struct SalarySlip {
     pub match_confidence: f64,
     pub match_status: String,
     pub duplicate_of_id: Option<String>,
+    pub ocr_confidence: Option<f64>,
+    pub ocr_processed_at: Option<String>,
+    pub ocr_error: Option<String>,
+    pub matched_employee_id: Option<String>,
+    pub match_reason: Option<String>,
+    pub matched_at: Option<String>,
+    pub reviewed_at: Option<String>,
+    pub reviewed_by: Option<String>,
+    pub review_note: Option<String>,
     pub created_at: String,
     pub updated_at: String,
 }
@@ -36,6 +45,19 @@ pub struct ScanSummary {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ExtractionSummary {
+    pub total: usize,
+    pub processed: usize,
+    pub identified: usize,
+    pub partially_identified: usize,
+    pub not_identified: usize,
+    pub failed: usize,
+    pub skipped: usize,
+    pub slips: Vec<SalarySlip>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct OcrBatchSummary {
     pub total: usize,
     pub processed: usize,
     pub identified: usize,

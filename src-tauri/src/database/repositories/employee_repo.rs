@@ -42,6 +42,37 @@ impl EmployeeRepository {
         Ok(employees)
     }
 
+    pub fn find_by_id(&self, conn: &Connection, id: &str) -> Result<Option<Employee>, String> {
+        let mut stmt = conn
+            .prepare(
+                "SELECT id, employee_id, name, phone, whatsapp_number, email, department, designation, created_at, updated_at FROM employees WHERE id = ?1 OR employee_id = ?1",
+            )
+            .map_err(|e| e.to_string())?;
+
+        let mut rows = stmt
+            .query_map(params![id], |row| {
+                Ok(Employee {
+                    id: row.get(0)?,
+                    employee_id: row.get(1)?,
+                    name: row.get(2)?,
+                    phone: row.get(3)?,
+                    whatsapp_number: row.get(4)?,
+                    email: row.get(5)?,
+                    department: row.get(6)?,
+                    designation: row.get(7)?,
+                    created_at: row.get(8)?,
+                    updated_at: row.get(9)?,
+                })
+            })
+            .map_err(|e| e.to_string())?;
+
+        if let Some(row) = rows.next() {
+            row.map(Some).map_err(|e| e.to_string())
+        } else {
+            Ok(None)
+        }
+    }
+
     pub fn bulk_insert(
         &self,
         conn: &mut Connection,

@@ -1,11 +1,17 @@
+pub mod delivery;
 pub mod employee;
 pub mod mapping;
 pub mod message_log;
 pub mod salary_slip;
 pub mod settings;
 
-pub use employee::{Employee, CreateEmployeeInput};
+pub use delivery::{DeliveryBatchSummary, DeliveryChannel, DeliveryPreview, DeliveryRecord, DeliveryStatus};
+pub use employee::{CreateEmployeeInput, Employee};
 pub use mapping::Mapping;
 pub use message_log::MessageLog;
-pub use salary_slip::{SalarySlip, ScanSummary, ExtractionSummary};
-pub use settings::AppSettings;
+pub use salary_slip::{ExtractionSummary, OcrBatchSummary, SalarySlip, ScanSummary};
+pub use settings::{
+    AppSettings, AppSettingsResponse, ConnectionTestResult, EmailConfig, EmailConfigResponse,
+    MessageTemplateConfig, SaveAppSettingsPayload, SaveEmailPayload, SaveTemplatePayload,
+    SaveWhatsAppPayload, WhatsAppConfig, WhatsAppConfigResponse,
+};

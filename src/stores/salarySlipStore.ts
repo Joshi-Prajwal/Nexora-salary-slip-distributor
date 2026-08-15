@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { SalarySlip, ScanSummary, ExtractionSummary } from '../types/salarySlip';
+import { SalarySlip, ScanSummary, ExtractionSummary, OcrBatchSummary } from '../types/salarySlip';
 import { salarySlipService } from '../services/salarySlipService';
 
 interface SalarySlipState {
@@ -7,13 +7,17 @@ interface SalarySlipState {
   scannedFolderPath: string | null;
   isScanning: boolean;
   isExtracting: boolean;
+  isOcrProcessing: boolean;
   lastScanSummary: ScanSummary | null;
   lastExtractionSummary: ExtractionSummary | null;
+  lastOcrBatchSummary: OcrBatchSummary | null;
   selectedSlip: SalarySlip | null;
   scanFolder: (path: string) => Promise<ScanSummary | null>;
   fetchSalarySlips: () => Promise<void>;
   extractSlip: (id: string) => Promise<SalarySlip | null>;
   extractAll: () => Promise<ExtractionSummary | null>;
+  runOcr: (id: string) => Promise<SalarySlip | null>;
+  runBatchOcr: () => Promise<OcrBatchSummary | null>;
   removeSlipRecord: (id: string) => Promise<void>;
   setSelectedSlip: (slip: SalarySlip | null) => void;
 }
@@ -23,8 +27,10 @@ export const useSalarySlipStore = create<SalarySlipState>((set, get) => ({
   scannedFolderPath: null,
   isScanning: false,
   isExtracting: false,
+  isOcrProcessing: false,
   lastScanSummary: null,
   lastExtractionSummary: null,
+  lastOcrBatchSummary: null,
   selectedSlip: null,
   fetchSalarySlips: async () => {
     try {
@@ -76,6 +82,36 @@ export const useSalarySlipStore = create<SalarySlipState>((set, get) => ({
       return summary;
     } catch (err) {
       set({ isExtracting: false });
+      throw err;
+    }
+  },
+  runOcr: async (id: string) => {
+    set({ isOcrProcessing: true });
+    try {
+      const updated = await salarySlipService.runOcrFallback(id);
+      await get().fetchSalarySlips();
+      if (get().selectedSlip?.id === id && updated) {
+        set({ selectedSlip: updated });
+      }
+      set({ isOcrProcessing: false });
+      return updated;
+    } catch (err) {
+      set({ isOcrProcessing: false });
+      throw err;
+    }
+  },
+  runBatchOcr: async () => {
+    set({ isOcrProcessing: true });
+    try {
+      const summary = await salarySlipService.runBatchOcrFallback();
+      set({
+        slips: summary.slips,
+        lastOcrBatchSummary: summary,
+        isOcrProcessing: false,
+      });
+      return summary;
+    } catch (err) {
+      set({ isOcrProcessing: false });
       throw err;
     }
   },

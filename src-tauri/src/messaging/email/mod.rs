@@ -1,3 +1,3 @@
 pub mod provider;
 
-pub use provider::{EmailProvider, SmtpEmailProvider};
+pub use provider::{replace_placeholders, EmailProvider, SmtpEmailProvider};

@@ -1,26 +1,49 @@
-import { MatchStatus } from './salarySlip';
+export type MatchStatus =
+  | 'EXACT_MATCH'
+  | 'STRONG_MATCH'
+  | 'POSSIBLE_MATCH'
+  | 'NO_MATCH'
+  | 'CONFLICT'
+  | 'MANUAL_REVIEW'
+  | 'MANUALLY_CONFIRMED'
+  | 'MANUALLY_REJECTED'
+  | 'UNMATCHED';
 
-export type MatchMethod =
-  | 'EXACT_EMPLOYEE_ID'
-  | 'NORMALIZED_EMPLOYEE_ID'
-  | 'EXACT_NAME'
-  | 'PHONE'
-  | 'EMAIL'
-  | 'COMBINED_SIGNALS'
-  | 'MANUAL_REVIEW';
+export interface MatchCandidate {
+  employeeDbId: string;
+  employeeId: string;
+  name: string;
+  email?: string;
+  phone?: string;
+  department?: string;
+  designation?: string;
+  score: number;
+  matchedFields: string[];
+  unmatchedFields: string[];
+  explanation: string;
+}
 
-export interface MatchingResult {
+export interface MatchResult {
   salarySlipId: string;
-  candidateEmployeeId?: string;
-  matchMethod: MatchMethod;
-  confidence: number; // 0.0 to 1.0
-  confirmed: boolean;
   status: MatchStatus;
-  notes?: string;
+  confidence: number; // 0.0 to 1.0
+  matchedEmployeeId?: string;
+  candidate?: MatchCandidate;
+  allCandidates: MatchCandidate[];
+  reason: string;
+}
+
+export interface BatchMatchSummary {
+  total: number;
+  exactMatches: number;
+  strongMatches: number;
+  possibleMatches: number;
+  conflicts: number;
+  noMatches: number;
+  alreadyReviewed: number;
 }
 
 export interface MatchingFilter {
-  status?: MatchStatus;
-  minConfidence?: number;
+  status?: string;
   searchQuery?: string;
 }

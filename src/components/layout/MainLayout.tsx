@@ -1,6 +1,7 @@
 import React from 'react';
 import { Sidebar } from './Sidebar';
 import { TopHeader } from './TopHeader';
+import { ToastContainer } from '../common/ToastContainer';
 
 export const MainLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   return (
@@ -10,6 +11,7 @@ export const MainLayout: React.FC<{ children: React.ReactNode }> = ({ children }
         <TopHeader />
         <main className="flex-1 overflow-y-auto p-6 md:p-8 max-w-7xl w-full mx-auto">{children}</main>
       </div>
+      <ToastContainer />
     </div>
   );
 };

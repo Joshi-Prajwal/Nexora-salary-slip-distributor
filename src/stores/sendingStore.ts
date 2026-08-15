@@ -1,20 +1,32 @@
 import { create } from 'zustand';
-import { SendJob, SendProgress } from '../types/sending';
-import { sendingService } from '../services/sendingService';
+import { SendProgress } from '../types/sending';
+import { DeliveryRecord } from '../types/delivery';
+import { deliveryService } from '../services/deliveryService';
 
 interface SendingState {
-  jobs: SendJob[];
+  records: DeliveryRecord[];
   progress: SendProgress;
   isSending: boolean;
-  refreshProgress: () => Promise<void>;
+  fetchRecords: () => Promise<void>;
 }
 
 export const useSendingStore = create<SendingState>((set) => ({
-  jobs: [],
+  records: [],
   progress: { total: 0, completed: 0, successful: 0, failed: 0, inProgress: false },
   isSending: false,
-  refreshProgress: async () => {
-    const progress = await sendingService.getProgress();
-    set({ progress, isSending: progress.inProgress });
+  fetchRecords: async () => {
+    const records = await deliveryService.getDeliveryRecords();
+    const successful = records.filter((r) => r.status === 'SENT').length;
+    const failed = records.filter((r) => r.status === 'FAILED').length;
+    set({
+      records,
+      progress: {
+        total: records.length,
+        completed: records.length,
+        successful,
+        failed,
+        inProgress: false,
+      },
+    });
   },
 }));

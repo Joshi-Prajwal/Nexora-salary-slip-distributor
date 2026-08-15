@@ -1,4 +1,5 @@
 import { CommunicationChannel } from './messaging';
+import { DeliveryRecord, DeliveryBatchSummary, DeliveryPreview } from './delivery';
 
 export type SendStatus = 'QUEUED' | 'PROCESSING' | 'SENT' | 'FAILED' | 'RETRYING' | 'CANCELLED';
 
@@ -23,3 +24,5 @@ export interface SendProgress {
   failed: number;
   inProgress: boolean;
 }
+
+export type { DeliveryRecord, DeliveryBatchSummary, DeliveryPreview };

@@ -1,9 +1,11 @@
+pub mod delivery_repo;
 pub mod employee_repo;
 pub mod mapping_repo;
 pub mod message_log_repo;
 pub mod salary_slip_repo;
 pub mod settings_repo;
 
+pub use delivery_repo::DeliveryRepository;
 pub use employee_repo::EmployeeRepository;
 pub use mapping_repo::MappingRepository;
 pub use message_log_repo::MessageLogRepository;

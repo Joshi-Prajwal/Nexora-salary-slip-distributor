@@ -8,6 +8,7 @@ interface EmployeeState {
   searchQuery: string;
   fetchEmployees: () => Promise<void>;
   importEmployees: (inputs: CreateEmployeeInput[]) => Promise<number>;
+  replaceAllEmployees: (inputs: CreateEmployeeInput[]) => Promise<number>;
   setSearchQuery: (query: string) => void;
 }
 
@@ -30,6 +31,17 @@ export const useEmployeeStore = create<EmployeeState>((set, get) => ({
       const result = await employeeService.importEmployeesFromExcel(inputs);
       await get().fetchEmployees();
       return result.importedCount;
+    } catch (err) {
+      set({ isLoading: false });
+      throw err;
+    }
+  },
+  replaceAllEmployees: async (inputs: CreateEmployeeInput[]) => {
+    set({ isLoading: true });
+    try {
+      const result = await employeeService.replaceAllEmployees(inputs);
+      await get().fetchEmployees();
+      return result.replacedCount;
     } catch (err) {
       set({ isLoading: false });
       throw err;

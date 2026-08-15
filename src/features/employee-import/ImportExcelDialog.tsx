@@ -13,7 +13,7 @@ import { Upload, FileSpreadsheet, AlertTriangle } from 'lucide-react';
 interface ImportExcelDialogProps {
   isOpen: boolean;
   onClose: () => void;
-  onSuccess: (count: number, skippedCount: number) => void;
+  onSuccess: (newCount: number, updatedCount: number, unchangedCount: number) => void;
 }
 
 export const ImportExcelDialog: React.FC<ImportExcelDialogProps> = ({ isOpen, onClose, onSuccess }) => {
@@ -28,11 +28,9 @@ export const ImportExcelDialog: React.FC<ImportExcelDialogProps> = ({ isOpen, on
     const file = e.target.files?.[0];
     if (!file) return;
 
-    // Reset state
     setErrorMessage(null);
     setSummary(null);
 
-    // Validate file extension
     const ext = file.name.split('.').pop()?.toLowerCase();
     if (ext !== 'xlsx' && ext !== 'xls') {
       setErrorMessage('Please select an Excel file (.xlsx or .xls).');
@@ -45,8 +43,8 @@ export const ImportExcelDialog: React.FC<ImportExcelDialogProps> = ({ isOpen, on
       const arrayBuffer = await file.arrayBuffer();
 
       setLoadingStep('Checking employee details...');
-      const existingEmployeeIds = new Set(employees.map((emp) => emp.employeeId.toLowerCase()));
-      const result = await parseExcelWorkbook(arrayBuffer, { existingEmployeeIds });
+      const existingEmployeesMap = new Map(employees.map((emp) => [emp.employeeId.toLowerCase(), emp]));
+      const result = await parseExcelWorkbook(arrayBuffer, { existingEmployees: existingEmployeesMap });
 
       setSummary(result);
       setLoadingStep(null);
@@ -59,29 +57,31 @@ export const ImportExcelDialog: React.FC<ImportExcelDialogProps> = ({ isOpen, on
   };
 
   const handleConfirmImport = async () => {
-    if (!summary || summary.readyCount === 0) return;
+    if (!summary) return;
+
+    const validRowsToSave = summary.rows
+      .filter((r) => r.status === 'NEW' || r.status === 'UPDATED' || r.status === 'READY')
+      .map((r) => ({
+        employeeId: r.data.employeeId,
+        name: r.data.fullName,
+        email: r.data.email,
+        phone: r.data.phone || '',
+        whatsappNumber: r.data.phone || '',
+        department: r.data.department || '',
+        designation: r.data.designation || '',
+      }));
+
+    if (validRowsToSave.length === 0) return;
 
     try {
-      setLoadingStep('Importing employees...');
-      const validRowsToSave = summary.rows
-        .filter((r) => r.status === 'READY')
-        .map((r) => ({
-          employeeId: r.data.employeeId,
-          name: r.data.fullName,
-          email: r.data.email,
-          phone: r.data.phone || '',
-          whatsappNumber: r.data.phone || '',
-          department: r.data.department || '',
-          designation: '',
-        }));
-
-      const importedCount = await importEmployees(validRowsToSave);
+      setLoadingStep('Importing and updating employee records...');
+      await importEmployees(validRowsToSave);
       setLoadingStep(null);
-      onSuccess(importedCount, summary.alreadyImportedCount);
+      onSuccess(summary.newCount, summary.updatedCount, summary.unchangedCount);
       handleClose();
     } catch (err: any) {
       setLoadingStep(null);
-      setErrorMessage('Failed to save imported employees. Please try again.');
+      setErrorMessage('Failed to save employee records. Please try again.');
     }
   };
 
@@ -91,6 +91,8 @@ export const ImportExcelDialog: React.FC<ImportExcelDialogProps> = ({ isOpen, on
     setLoadingStep(null);
     onClose();
   };
+
+  const totalToProcess = summary ? summary.newCount + summary.updatedCount : 0;
 
   return (
     <>
@@ -105,11 +107,10 @@ export const ImportExcelDialog: React.FC<ImportExcelDialogProps> = ({ isOpen, on
       <Dialog
         isOpen={isOpen}
         onClose={handleClose}
-        title="Import Employees from Excel"
+        title="Import / Update Employees from Excel"
         maxWidth="max-w-3xl"
       >
         <div className="space-y-4">
-          {/* Loading State */}
           {loadingStep && (
             <div className="py-12 flex flex-col items-center justify-center gap-3">
               <Spinner size="lg" />
@@ -117,7 +118,6 @@ export const ImportExcelDialog: React.FC<ImportExcelDialogProps> = ({ isOpen, on
             </div>
           )}
 
-          {/* Initial File Selector State */}
           {!loadingStep && !summary && !errorMessage && (
             <div className="py-8 flex flex-col items-center justify-center border-2 border-dashed border-slate-200 rounded-xl bg-slate-50/50 p-6 text-center">
               <div className="p-3 bg-sky-50 text-sky-600 rounded-full mb-3">
@@ -125,7 +125,7 @@ export const ImportExcelDialog: React.FC<ImportExcelDialogProps> = ({ isOpen, on
               </div>
               <h4 className="text-sm font-semibold text-slate-900">Select an Excel Spreadsheet</h4>
               <p className="text-xs text-slate-500 max-w-sm mt-1 mb-4">
-                Upload a .xlsx or .xls file containing your employee records.
+                Upload a .xlsx or .xls file containing employee records to import new employees or update existing records.
               </p>
               <Button
                 variant="primary"
@@ -137,7 +137,6 @@ export const ImportExcelDialog: React.FC<ImportExcelDialogProps> = ({ isOpen, on
             </div>
           )}
 
-          {/* Error Message Alert */}
           {errorMessage && (
             <div className="space-y-4">
               <Alert type="error" title="Import Error">
@@ -157,7 +156,6 @@ export const ImportExcelDialog: React.FC<ImportExcelDialogProps> = ({ isOpen, on
             </div>
           )}
 
-          {/* Missing Required Columns Alert */}
           {summary && summary.missingRequiredColumns && summary.missingRequiredColumns.length > 0 && (
             <div className="space-y-4">
               <Alert type="error" title="Some required columns are missing.">
@@ -169,7 +167,7 @@ export const ImportExcelDialog: React.FC<ImportExcelDialogProps> = ({ isOpen, on
                     ))}
                   </ul>
                   <p className="mt-2 text-slate-600">
-                    Please ensure your Excel file contains column headers for Employee ID, Full Name, and Email Address.
+                    Please ensure your Excel file contains column headers for Employee ID and Full Name.
                   </p>
                 </div>
               </Alert>
@@ -184,7 +182,6 @@ export const ImportExcelDialog: React.FC<ImportExcelDialogProps> = ({ isOpen, on
             </div>
           )}
 
-          {/* Import Preview View */}
           {summary && (!summary.missingRequiredColumns || summary.missingRequiredColumns.length === 0) && !loadingStep && (
             <div className="space-y-4">
               <ImportSummary summary={summary} />
@@ -205,10 +202,10 @@ export const ImportExcelDialog: React.FC<ImportExcelDialogProps> = ({ isOpen, on
                   </Button>
                   <Button
                     variant="primary"
-                    disabled={summary.readyCount === 0}
+                    disabled={totalToProcess === 0}
                     onClick={handleConfirmImport}
                   >
-                    Import {summary.readyCount} Employees
+                    {totalToProcess > 0 ? `Import / Update ${totalToProcess} Employees` : 'No Changes Required'}
                   </Button>
                 </div>
               </div>

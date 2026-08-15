@@ -4,6 +4,9 @@
   "description": "Default capability for Salary Slip Distributor",
   "windows": ["main"],
   "permissions": [
-    "core:default"
+    "core:default",
+    "opener:default",
+    "dialog:default",
+    "dialog:allow-open"
   ]
 }

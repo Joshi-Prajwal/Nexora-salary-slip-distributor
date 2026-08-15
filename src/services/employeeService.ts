@@ -3,9 +3,6 @@ import { Employee, CreateEmployeeInput } from '../types/employee';
 const LOCAL_STORAGE_KEY = 'nexora_employees_db';
 let memoryEmployeesStore: Employee[] = [];
 
-/**
- * Helper to safely invoke Tauri Rust backend commands if running in desktop app
- */
 async function tryTauriInvoke<T>(cmd: string, args?: Record<string, any>): Promise<T | null> {
   if (typeof window !== 'undefined' && (window as any).__TAURI_INTERNALS__) {
     try {
@@ -18,19 +15,13 @@ async function tryTauriInvoke<T>(cmd: string, args?: Record<string, any>): Promi
   return null;
 }
 
-/**
- * Employee Application Service
- * Manages local employee records and persistence via Tauri + SQLite (falling back to web/memory storage for test runners)
- */
 export const employeeService = {
   async getAllEmployees(): Promise<Employee[]> {
-    // 1. Attempt SQLite retrieval via Tauri command
     const tauriResult = await tryTauriInvoke<Employee[]>('get_employees');
     if (tauriResult !== null) {
       return tauriResult;
     }
 
-    // 2. Web / Vitest fallback
     try {
       if (typeof window !== 'undefined' && window.localStorage) {
         const stored = window.localStorage.getItem(LOCAL_STORAGE_KEY);
@@ -46,7 +37,6 @@ export const employeeService = {
   },
 
   async importEmployeesFromExcel(inputs: CreateEmployeeInput[]): Promise<{ success: boolean; importedCount: number }> {
-    // 1. Attempt SQLite transaction insertion via Tauri command
     const tauriResult = await tryTauriInvoke<number>('import_employees', { employees: inputs });
     if (tauriResult !== null) {
       return {
@@ -55,35 +45,74 @@ export const employeeService = {
       };
     }
 
-    // 2. Web / Vitest fallback
     const existing = await this.getAllEmployees();
-    const existingIds = new Set(existing.map((e) => e.employeeId.toLowerCase()));
-
-    const newEmployees: Employee[] = [];
+    const existingMap = new Map(existing.map((e) => [e.employeeId.toLowerCase(), e]));
     const now = new Date().toISOString();
 
+    const resultList: Employee[] = [...existing];
+    let count = 0;
+
     for (const input of inputs) {
-      if (!existingIds.has(input.employeeId.toLowerCase())) {
-        existingIds.add(input.employeeId.toLowerCase());
-        newEmployees.push({
+      const key = input.employeeId.toLowerCase();
+      const existingEmp = existingMap.get(key);
+      if (existingEmp) {
+        existingEmp.name = input.name || existingEmp.name;
+        existingEmp.phone = input.phone || existingEmp.phone;
+        existingEmp.email = input.email || existingEmp.email;
+        existingEmp.department = input.department || existingEmp.department;
+        existingEmp.designation = input.designation || existingEmp.designation;
+        existingEmp.updatedAt = now;
+        count++;
+      } else {
+        const newEmp: Employee = {
           ...input,
           id: `emp-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`,
           createdAt: now,
           updatedAt: now,
-        });
+        };
+        existingMap.set(key, newEmp);
+        resultList.push(newEmp);
+        count++;
       }
     }
 
-    const updatedList = [...existing, ...newEmployees];
-    memoryEmployeesStore = updatedList;
+    memoryEmployeesStore = resultList;
 
     if (typeof window !== 'undefined' && window.localStorage) {
-      window.localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(updatedList));
+      window.localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(resultList));
     }
 
     return {
       success: true,
-      importedCount: newEmployees.length,
+      importedCount: count,
+    };
+  },
+
+  async replaceAllEmployees(inputs: CreateEmployeeInput[]): Promise<{ success: boolean; replacedCount: number }> {
+    const tauriResult = await tryTauriInvoke<number>('replace_all_employees', { employees: inputs });
+    if (tauriResult !== null) {
+      return {
+        success: true,
+        replacedCount: tauriResult,
+      };
+    }
+
+    const now = new Date().toISOString();
+    const newEmployees: Employee[] = inputs.map((input) => ({
+      ...input,
+      id: `emp-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`,
+      createdAt: now,
+      updatedAt: now,
+    }));
+
+    memoryEmployeesStore = newEmployees;
+    if (typeof window !== 'undefined' && window.localStorage) {
+      window.localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(newEmployees));
+    }
+
+    return {
+      success: true,
+      replacedCount: newEmployees.length,
     };
   },
 

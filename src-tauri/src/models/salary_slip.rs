@@ -1,4 +1,5 @@
 use serde::{Deserialize, Serialize};
+use crate::filesystem::{DiscoveredFile, ScanError};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -25,6 +26,10 @@ pub struct SalarySlip {
     pub reviewed_at: Option<String>,
     pub reviewed_by: Option<String>,
     pub review_note: Option<String>,
+    pub month: Option<String>,
+    pub year: Option<String>,
+    pub approval_status: String,
+    pub ocr_status: String,
     pub created_at: String,
     pub updated_at: String,
 }
@@ -39,6 +44,11 @@ pub struct ScanSummary {
     pub unchanged_count: usize,
     pub duplicate_count: usize,
     pub folder_path: String,
+    pub display_name: String,
+    pub directories_scanned: usize,
+    pub files_scanned: usize,
+    pub scan_errors: Vec<ScanError>,
+    pub files: Vec<DiscoveredFile>,
     pub slips: Vec<SalarySlip>,
 }
 
@@ -65,5 +75,14 @@ pub struct OcrBatchSummary {
     pub not_identified: usize,
     pub failed: usize,
     pub skipped: usize,
+    pub slips: Vec<SalarySlip>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BulkConfirmResult {
+    pub confirmed_count: usize,
+    pub skipped_count: usize,
+    pub skipped_reasons: Vec<String>,
     pub slips: Vec<SalarySlip>,
 }

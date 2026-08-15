@@ -8,36 +8,57 @@ import { Toast } from '../../components/common/Toast';
 import { EmptyState } from '../../components/feedback/EmptyState';
 import { StatusBadge } from '../../components/feedback/StatusBadge';
 import { ImportExcelDialog } from '../../features/employee-import/ImportExcelDialog';
+import { ReplaceAllEmployeesDialog } from '../../features/employee-import/ReplaceAllEmployeesDialog';
 import { useEmployeeStore } from '../../stores/employeeStore';
 import { Employee } from '../../types/employee';
-import { Upload, Users } from 'lucide-react';
+import { Upload, Users, RefreshCw, Trash2 } from 'lucide-react';
 
 export const EmployeesPage: React.FC = () => {
   const { employees, fetchEmployees, searchQuery, setSearchQuery } = useEmployeeStore();
   const [isImportOpen, setIsImportOpen] = useState(false);
+  const [isReplaceOpen, setIsReplaceOpen] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   useEffect(() => {
     fetchEmployees();
   }, [fetchEmployees]);
 
-  const handleImportSuccess = (importedCount: number, skippedCount: number) => {
-    let msg = `${importedCount} employee${importedCount === 1 ? '' : 's'} imported successfully.`;
-    if (skippedCount > 0) {
-      msg = `${importedCount} employee${importedCount === 1 ? '' : 's'} imported. ${skippedCount} were already in Nexora.`;
+  const handleImportSuccess = (newCount: number, updatedCount: number, _unchangedCount: number) => {
+    fetchEmployees();
+    const parts: string[] = [];
+    if (newCount > 0) {
+      parts.push(`${newCount} new employee${newCount === 1 ? '' : 's'} imported`);
     }
-    setToastMessage(msg);
+    if (updatedCount > 0) {
+      parts.push(`${updatedCount} employee record${updatedCount === 1 ? '' : 's'} updated`);
+    }
+    if (parts.length === 0) {
+      setToastMessage('Employee list processed cleanly (no changes required).');
+    } else {
+      setToastMessage(`${parts.join(', ')} successfully.`);
+    }
+  };
+
+  const handleReplaceSuccess = (replacedCount: number) => {
+    fetchEmployees();
+    setToastMessage(`Master employee dataset replaced cleanly with ${replacedCount} employee records.`);
   };
 
   const filteredEmployees = employees.filter((emp) => {
     if (!searchQuery.trim()) return true;
     const query = searchQuery.toLowerCase().trim();
+    const phoneRaw = emp.phone ? String(emp.phone).toLowerCase() : '';
+    const phoneClean = phoneRaw.replace(/\D/g, '');
+    const queryClean = query.replace(/\D/g, '');
+
     return (
-      emp.name.toLowerCase().includes(query) ||
-      emp.employeeId.toLowerCase().includes(query) ||
-      emp.email.toLowerCase().includes(query) ||
+      (emp.name && emp.name.toLowerCase().includes(query)) ||
+      (emp.employeeId && emp.employeeId.toLowerCase().includes(query)) ||
+      (emp.email && emp.email.toLowerCase().includes(query)) ||
       (emp.department && emp.department.toLowerCase().includes(query)) ||
-      (emp.phone && emp.phone.toLowerCase().includes(query))
+      (emp.designation && emp.designation.toLowerCase().includes(query)) ||
+      (phoneRaw && phoneRaw.includes(query)) ||
+      (queryClean.length >= 2 && phoneClean.includes(queryClean))
     );
   });
 
@@ -58,15 +79,34 @@ export const EmployeesPage: React.FC = () => {
     <div className="space-y-6">
       <PageHeader
         title="Employees"
-        subtitle="Manage your employee contact list."
+        subtitle="Manage your employee contact list, import updates, or replace master dataset via Excel."
         action={
-          <Button
-            variant="primary"
-            icon={<Upload className="w-4 h-4" />}
-            onClick={() => setIsImportOpen(true)}
-          >
-            Import Excel
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              icon={<RefreshCw className="w-3.5 h-3.5" />}
+              onClick={() => setIsImportOpen(true)}
+            >
+              Update Excel
+            </Button>
+            <Button
+              variant="primary"
+              size="sm"
+              icon={<Upload className="w-3.5 h-3.5" />}
+              onClick={() => setIsImportOpen(true)}
+            >
+              Import Excel
+            </Button>
+            <Button
+              variant="danger"
+              size="sm"
+              icon={<Trash2 className="w-3.5 h-3.5" />}
+              onClick={() => setIsReplaceOpen(true)}
+            >
+              Replace All Employees
+            </Button>
+          </div>
         }
       />
 
@@ -82,11 +122,12 @@ export const EmployeesPage: React.FC = () => {
         <Card noPadding>
           <div className="p-4 border-b border-slate-100 flex items-center justify-between gap-4">
             <SearchInput
-              placeholder="Search by name, ID, email, department, or phone..."
+              placeholder="Search by name, ID, email, department, phone..."
               value={searchQuery}
               onSearchChange={setSearchQuery}
+              containerClassName="w-full max-w-lg"
             />
-            <span className="text-xs text-slate-500 font-medium">{filteredEmployees.length} employees found</span>
+            <span className="text-xs text-slate-500 font-medium whitespace-nowrap">{filteredEmployees.length} employees found</span>
           </div>
           <Table<Employee>
             columns={columns}
@@ -97,11 +138,18 @@ export const EmployeesPage: React.FC = () => {
         </Card>
       )}
 
-      {/* Import Excel Modal Dialog */}
+      {/* Import / Update Excel Modal Dialog */}
       <ImportExcelDialog
         isOpen={isImportOpen}
         onClose={() => setIsImportOpen(false)}
         onSuccess={handleImportSuccess}
+      />
+
+      {/* Replace All Employees Modal Dialog */}
+      <ReplaceAllEmployeesDialog
+        isOpen={isReplaceOpen}
+        onClose={() => setIsReplaceOpen(false)}
+        onSuccess={handleReplaceSuccess}
       />
 
       {/* Toast Notification Alert */}

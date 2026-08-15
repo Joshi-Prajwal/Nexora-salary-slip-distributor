@@ -281,6 +281,7 @@ impl DeliveryService {
                             created_at: created.clone(),
                             started_at: Some(created.clone()),
                             completed_at: None,
+                            employee_name: Some(emp.name.clone()),
                         };
 
                         self.delivery_repo.create_record(conn, &new_rec)?;
@@ -375,6 +376,7 @@ impl DeliveryService {
                         created_at: created.clone(),
                         started_at: Some(created.clone()),
                         completed_at: None,
+                        employee_name: Some(emp.name.clone()),
                     };
 
                     self.delivery_repo.create_record(conn, &new_rec)?;
@@ -471,6 +473,7 @@ impl DeliveryService {
                             created_at: created.clone(),
                             started_at: Some(created.clone()),
                             completed_at: None,
+                            employee_name: Some(emp.name.clone()),
                         };
 
                         self.delivery_repo.create_record(conn, &new_rec)?;
@@ -550,6 +553,7 @@ impl DeliveryService {
                         created_at: created.clone(),
                         started_at: Some(created.clone()),
                         completed_at: None,
+                        employee_name: Some(emp.name.clone()),
                     };
 
                     self.delivery_repo.create_record(conn, &new_rec)?;

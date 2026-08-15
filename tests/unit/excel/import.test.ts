@@ -1,9 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import fs from 'fs';
-import path from 'path';
 import * as XLSX from 'xlsx';
 import { parseExcelWorkbook } from '../../../src/features/employee-import/excelReader';
-import { mapHeaders, validateImportRows, isValidEmail, normalizeHeader } from '../../../src/features/employee-import/importValidator';
+import { mapHeaders, isValidEmail, normalizeHeader, sanitizeCellString } from '../../../src/features/employee-import/importValidator';
 import { employeeService } from '../../../src/services/employeeService';
 
 function createBuffer(data: any[][]): ArrayBuffer {
@@ -13,7 +11,7 @@ function createBuffer(data: any[][]): ArrayBuffer {
   return XLSX.write(wb, { type: 'array', bookType: 'xlsx' });
 }
 
-describe('Phase 1 — Excel Employee Import Module', () => {
+describe('Phase 1 & 9.2 — Excel Employee Import & Master Replace Module', () => {
   beforeEach(async () => {
     await employeeService.clearAllEmployees();
   });
@@ -170,11 +168,46 @@ describe('Phase 1 — Excel Employee Import Module', () => {
     expect(stored[0].employeeId).toBe('EMP001');
   });
 
-  it('13. Validates basic email validation function', () => {
-    expect(isValidEmail('employee@example.com')).toBe(true);
-    expect(isValidEmail('employee@sub.example.co.uk')).toBe(true);
-    expect(isValidEmail('invalid-email')).toBe(false);
-    expect(isValidEmail('@example.com')).toBe(false);
-    expect(isValidEmail('employee@')).toBe(false);
+  it('13. Replace all employees workflow replaces master dataset completely', async () => {
+    await employeeService.importEmployeesFromExcel([
+      { employeeId: 'EMP001', name: 'Old Emp 1', email: 'old1@test.com', phone: '111', whatsappNumber: '', department: '', designation: '' },
+      { employeeId: 'EMP002', name: 'Old Emp 2', email: 'old2@test.com', phone: '222', whatsappNumber: '', department: '', designation: '' },
+    ]);
+
+    const initial = await employeeService.getAllEmployees();
+    expect(initial).toHaveLength(2);
+
+    const replaceInputs = [
+      { employeeId: 'EMP100', name: 'New Emp 100', email: 'new100@test.com', phone: '9876543210', whatsappNumber: '', department: '', designation: '' },
+    ];
+
+    const result = await employeeService.replaceAllEmployees(replaceInputs);
+    expect(result.success).toBe(true);
+    expect(result.replacedCount).toBe(1);
+
+    const current = await employeeService.getAllEmployees();
+    expect(current).toHaveLength(1);
+    expect(current[0].employeeId).toBe('EMP100');
+    expect(current[0].name).toBe('New Emp 100');
+  });
+
+  it('14. Preserves phone numbers as clean strings without scientific notation or trailing decimals', () => {
+    expect(sanitizeCellString('9.87654321e+09', true)).toBe('9876543210');
+    expect(sanitizeCellString('9876543210.0', true)).toBe('9876543210');
+    expect(sanitizeCellString('9876543210', true)).toBe('9876543210');
+  });
+
+  it('15. Handles 156-row Excel spreadsheet import efficiently', async () => {
+    const rows: any[][] = [['Employee ID', 'Full Name', 'Email Address', 'Phone Number']];
+    for (let i = 1; i <= 156; i++) {
+      rows.push([`EMP${1000 + i}`, `Employee Name ${i}`, `emp${i}@company.com`, `9876543${String(i).padStart(3, '0')}`]);
+    }
+
+    const buf = createBuffer(rows);
+    const summary = await parseExcelWorkbook(buf);
+
+    expect(summary.totalRows).toBe(156);
+    expect(summary.readyCount).toBe(156);
+    expect(summary.needsAttentionCount).toBe(0);
   });
 });

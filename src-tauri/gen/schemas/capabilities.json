@@ -1,1 +1,1 @@
-{"default":{"identifier":"default","description":"Default capability for Salary Slip Distributor","local":true,"windows":["main"],"permissions":["core:default"]}}
+{"default":{"identifier":"default","description":"Default capability for Salary Slip Distributor","local":true,"windows":["main"],"permissions":["core:default","opener:default","dialog:default","dialog:allow-open"]}}

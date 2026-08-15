@@ -45,6 +45,8 @@ describe('Phase 2 Final Fix — Salary Slip Scanner & Content Duplicate Detectio
         extractionMethod: 'NOT_IDENTIFIED',
         matchConfidence: 0.0,
         matchStatus: 'UNMATCHED',
+        approvalStatus: 'PENDING',
+        ocrStatus: 'NOT_REQUIRED',
         createdAt: '1700000000',
         updatedAt: '1700000000',
       },
@@ -56,6 +58,7 @@ describe('Phase 2 Final Fix — Salary Slip Scanner & Content Duplicate Detectio
     expect(slips).toHaveLength(1);
     expect(slips[0].fileName).toBe('EMP001.pdf');
     expect(slips[0].matchStatus).toBe('UNMATCHED');
+    expect(slips[0].approvalStatus).toBe('PENDING');
   });
 
   it('2. Same path + same SHA results in unchanged status', async () => {
@@ -63,7 +66,7 @@ describe('Phase 2 Final Fix — Salary Slip Scanner & Content Duplicate Detectio
     const hash = createDummyPdf(pdfPath, 'Original content');
 
     const mockSlips: SalarySlip[] = [
-      { id: '1', filePath: pdfPath, fileName: 'EMP001.pdf', fileHash: hash, extractionMethod: 'NOT_IDENTIFIED', matchConfidence: 0, matchStatus: 'UNMATCHED', createdAt: '1', updatedAt: '1' },
+      { id: '1', filePath: pdfPath, fileName: 'EMP001.pdf', fileHash: hash, extractionMethod: 'NOT_IDENTIFIED', matchConfidence: 0, matchStatus: 'UNMATCHED', approvalStatus: 'PENDING', ocrStatus: 'NOT_REQUIRED', createdAt: '1', updatedAt: '1' },
     ];
     await salarySlipService.setMemoryStoreForTesting(mockSlips);
 
@@ -97,6 +100,8 @@ describe('Phase 2 Final Fix — Salary Slip Scanner & Content Duplicate Detectio
       extractionMethod: 'NOT_IDENTIFIED',
       matchConfidence: 0.0,
       matchStatus: 'UNMATCHED',
+      approvalStatus: 'PENDING',
+      ocrStatus: 'NOT_REQUIRED',
       createdAt: '100',
       updatedAt: '100',
     };
@@ -110,6 +115,8 @@ describe('Phase 2 Final Fix — Salary Slip Scanner & Content Duplicate Detectio
       matchConfidence: 0.0,
       matchStatus: 'DUPLICATE_CONTENT',
       duplicateOfId: 'slip-canonical',
+      approvalStatus: 'PENDING',
+      ocrStatus: 'NOT_REQUIRED',
       createdAt: '200',
       updatedAt: '200',
     };
@@ -134,8 +141,8 @@ describe('Phase 2 Final Fix — Salary Slip Scanner & Content Duplicate Detectio
 
   it('6. Multiple identical PDFs select earliest record as canonical', async () => {
     const hash = 'sha256-shared-hash';
-    const slip1: SalarySlip = { id: 's1', filePath: '/path1.pdf', fileName: '1.pdf', fileHash: hash, extractionMethod: 'NOT_IDENTIFIED', matchConfidence: 0, matchStatus: 'UNMATCHED', createdAt: '1000', updatedAt: '1000' };
-    const slip2: SalarySlip = { id: 's2', filePath: '/path2.pdf', fileName: '2.pdf', fileHash: hash, extractionMethod: 'NOT_IDENTIFIED', matchConfidence: 0, matchStatus: 'DUPLICATE_CONTENT', duplicateOfId: 's1', createdAt: '2000', updatedAt: '2000' };
+    const slip1: SalarySlip = { id: 's1', filePath: '/path1.pdf', fileName: '1.pdf', fileHash: hash, extractionMethod: 'NOT_IDENTIFIED', matchConfidence: 0, matchStatus: 'UNMATCHED', approvalStatus: 'PENDING', ocrStatus: 'NOT_REQUIRED', createdAt: '1000', updatedAt: '1000' };
+    const slip2: SalarySlip = { id: 's2', filePath: '/path2.pdf', fileName: '2.pdf', fileHash: hash, extractionMethod: 'NOT_IDENTIFIED', matchConfidence: 0, matchStatus: 'DUPLICATE_CONTENT', duplicateOfId: 's1', approvalStatus: 'PENDING', ocrStatus: 'NOT_REQUIRED', createdAt: '2000', updatedAt: '2000' };
 
     expect(slip2.duplicateOfId).toBe(slip1.id);
   });
@@ -153,6 +160,8 @@ describe('Phase 2 Final Fix — Salary Slip Scanner & Content Duplicate Detectio
       extractionMethod: 'NOT_IDENTIFIED',
       matchConfidence: 0,
       matchStatus: 'DUPLICATE_CONTENT',
+      approvalStatus: 'PENDING',
+      ocrStatus: 'NOT_REQUIRED',
       createdAt: '1',
       updatedAt: '1',
     };
@@ -162,7 +171,7 @@ describe('Phase 2 Final Fix — Salary Slip Scanner & Content Duplicate Detectio
 
     const slips = await salarySlipService.getSalarySlips();
     expect(slips).toHaveLength(0);
-    // CRITICAL READ-ONLY SAFETY ASSERTION:
+
     expect(fs.existsSync(dupPath)).toBe(true);
   });
 
@@ -209,5 +218,59 @@ describe('Phase 2 Final Fix — Salary Slip Scanner & Content Duplicate Detectio
     const emps = await employeeService.getAllEmployees();
     expect(emps).toHaveLength(1);
     expect(emps[0].employeeId).toBe('EMP-PHASE1-TEST');
+  });
+
+  it('13. Discovers root-level PDF files directly inside scanned directory', async () => {
+    const pdfPath1 = path.join(testDir, '203-Dr L B Singh.pdf');
+    const pdfPath2 = path.join(testDir, '502-Aravind S Kannur.PDF');
+    const hash1 = createDummyPdf(pdfPath1, 'Dr Singh PDF Content');
+    const hash2 = createDummyPdf(pdfPath2, 'Aravind PDF Content');
+
+    const mockSlips: SalarySlip[] = [
+      { id: '1', filePath: pdfPath1, fileName: '203-Dr L B Singh.pdf', fileHash: hash1, extractionMethod: 'NOT_IDENTIFIED', matchConfidence: 0, matchStatus: 'UNMATCHED', approvalStatus: 'PENDING', ocrStatus: 'NOT_REQUIRED', createdAt: '1', updatedAt: '1' },
+      { id: '2', filePath: pdfPath2, fileName: '502-Aravind S Kannur.PDF', fileHash: hash2, extractionMethod: 'NOT_IDENTIFIED', matchConfidence: 0, matchStatus: 'UNMATCHED', approvalStatus: 'PENDING', ocrStatus: 'NOT_REQUIRED', createdAt: '1', updatedAt: '1' },
+    ];
+    await salarySlipService.setMemoryStoreForTesting(mockSlips);
+
+    const slips = await salarySlipService.getSalarySlips();
+    expect(slips).toHaveLength(2);
+    expect(slips[0].fileName).toBe('203-Dr L B Singh.pdf');
+    expect(slips[1].fileName).toBe('502-Aravind S Kannur.PDF');
+  });
+
+  it('14. Rescan folder handles re-execution cleanly without duplicating store state', async () => {
+    const pdfPath = path.join(testDir, '144-Nusrat Anjum.pdf');
+    const hash = createDummyPdf(pdfPath, 'Nusrat PDF Content');
+
+    const mockSlips: SalarySlip[] = [
+      { id: '1', filePath: pdfPath, fileName: '144-Nusrat Anjum.pdf', fileHash: hash, extractionMethod: 'NOT_IDENTIFIED', matchConfidence: 0, matchStatus: 'UNMATCHED', approvalStatus: 'PENDING', ocrStatus: 'NOT_REQUIRED', createdAt: '1', updatedAt: '1' },
+    ];
+    await salarySlipService.setMemoryStoreForTesting(mockSlips);
+
+    const summary = await salarySlipService.scanFolder(testDir);
+    expect(summary.pdfCount).toBe(1);
+  });
+
+  it('15. Ingest paths handles array of file paths', async () => {
+    const pdfPath1 = path.join(testDir, 'FileA.pdf');
+    const pdfPath2 = path.join(testDir, 'FileB.pdf');
+    const hash1 = createDummyPdf(pdfPath1, 'Content A');
+    const hash2 = createDummyPdf(pdfPath2, 'Content B');
+
+    const mockSlips: SalarySlip[] = [
+      { id: '1', filePath: pdfPath1, fileName: 'FileA.pdf', fileHash: hash1, extractionMethod: 'NOT_IDENTIFIED', matchConfidence: 0, matchStatus: 'UNMATCHED', approvalStatus: 'PENDING', ocrStatus: 'NOT_REQUIRED', createdAt: '1', updatedAt: '1' },
+      { id: '2', filePath: pdfPath2, fileName: 'FileB.pdf', fileHash: hash2, extractionMethod: 'NOT_IDENTIFIED', matchConfidence: 0, matchStatus: 'UNMATCHED', approvalStatus: 'PENDING', ocrStatus: 'NOT_REQUIRED', createdAt: '1', updatedAt: '1' },
+    ];
+    await salarySlipService.setMemoryStoreForTesting(mockSlips);
+
+    const summary = await salarySlipService.ingestPaths([pdfPath1, pdfPath2]);
+    expect(summary.pdfCount).toBe(2);
+  });
+
+  it('16. Diagnose folder returns structured diagnostic object', async () => {
+    const diag = await salarySlipService.diagnoseFolder(testDir);
+    expect(diag.selectedPath).toBe(testDir);
+    expect(diag.exists).toBe(true);
+    expect(diag.isDirectory).toBe(true);
   });
 });

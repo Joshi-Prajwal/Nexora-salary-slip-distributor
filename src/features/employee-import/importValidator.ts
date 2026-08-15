@@ -5,36 +5,72 @@ import {
   ImportRowStatus,
 } from './importTypes';
 
-const HEADER_ALIASES: Record<keyof Omit<EmployeeImportRow, 'rowIndex' | 'designation'>, string[]> = {
-  employeeId: ['employee id', 'employeeid', 'employee code', 'emp code', 'employee code id', 'id', 'emp id', 'empid'],
+const HEADER_ALIASES: Record<keyof Omit<EmployeeImportRow, 'rowIndex'>, string[]> = {
+  employeeId: [
+    'employee id',
+    'employeeid',
+    'employee code',
+    'emp code',
+    'employee code id',
+    'id',
+    'emp id',
+    'empid',
+    'staff id',
+    'staff number',
+    'emp_id',
+    'employee_id',
+  ],
   fullName: ['full name', 'name', 'employee name', 'employee full name', 'fullname'],
   email: ['email', 'email address', 'email id', 'emailaddress'],
-  phone: ['phone', 'phone number', 'mobile', 'mobile number', 'contact number', 'phonenumber', 'contact'],
+  phone: [
+    'phone',
+    'phone number',
+    'mobile',
+    'mobile number',
+    'contact number',
+    'phonenumber',
+    'contact',
+    'contact_number',
+    'mobile_number',
+  ],
   department: ['department', 'dept'],
+  designation: ['designation', 'role', 'job title', 'job_title', 'title'],
 };
 
-/**
- * Normalizes a header string for case-insensitive, whitespace-trimmed comparison.
- */
 export function normalizeHeader(header: string): string {
-  return (header || '').toString().toLowerCase().trim().replace(/\s+/g, ' ');
+  return (header || '').toString().toLowerCase().trim().replace(/[\s_-]+/g, ' ');
 }
 
-/**
- * Maps raw spreadsheet headers to logical employee data fields.
- */
+export function sanitizeCellString(val: any, isPhone = false): string {
+  if (val === undefined || val === null) return '';
+  let str = String(val).trim();
+  if (isPhone) {
+    if (/^\d+(\.\d+)?e\+\d+$/i.test(str)) {
+      try {
+        str = BigInt(Math.round(Number(val))).toString();
+      } catch {
+        // keep string
+      }
+    }
+    if (/^\d+\.0$/.test(str)) {
+      str = str.replace(/\.0$/, '');
+    }
+  }
+  return str;
+}
+
 export function mapHeaders(rawHeaders: string[]): {
-  mapped: Record<string, keyof Omit<EmployeeImportRow, 'rowIndex' | 'designation'>>;
+  mapped: Record<string, keyof Omit<EmployeeImportRow, 'rowIndex'>>;
   missingRequired: string[];
 } {
-  const mapped: Record<string, keyof Omit<EmployeeImportRow, 'rowIndex' | 'designation'>> = {};
+  const mapped: Record<string, keyof Omit<EmployeeImportRow, 'rowIndex'>> = {};
   const foundFields = new Set<string>();
 
   for (const rawHeader of rawHeaders) {
     const normalized = normalizeHeader(rawHeader);
     for (const [field, aliases] of Object.entries(HEADER_ALIASES)) {
       if (aliases.includes(normalized) && !foundFields.has(field)) {
-        mapped[rawHeader] = field as keyof Omit<EmployeeImportRow, 'rowIndex' | 'designation'>;
+        mapped[rawHeader] = field as keyof Omit<EmployeeImportRow, 'rowIndex'>;
         foundFields.add(field);
         break;
       }
@@ -49,9 +85,6 @@ export function mapHeaders(rawHeaders: string[]): {
   return { mapped, missingRequired };
 }
 
-/**
- * Basic practical email validation regex.
- */
 export function isValidEmail(email: string): boolean {
   if (!email || typeof email !== 'string') return false;
   const trimmed = email.trim();
@@ -59,24 +92,26 @@ export function isValidEmail(email: string): boolean {
   return emailRegex.test(trimmed);
 }
 
-/**
- * Parses and validates raw spreadsheet rows against Nexora validation rules.
- */
 export function validateImportRows(
   rawRows: Record<string, any>[],
-  headerMapping: Record<string, keyof Omit<EmployeeImportRow, 'rowIndex' | 'designation'>>,
-  existingEmployeeIds: Set<string> = new Set()
+  headerMapping: Record<string, keyof Omit<EmployeeImportRow, 'rowIndex'>>,
+  existingEmployeesInput: Set<string> | Map<string, { name: string; email?: string; phone?: string; department?: string; designation?: string }> = new Set()
 ): EmployeeImportSummary {
+  const isSetInput = existingEmployeesInput instanceof Set;
+  const existingMap =
+    existingEmployeesInput instanceof Map
+      ? existingEmployeesInput
+      : new Map(Array.from(existingEmployeesInput).map((id) => [id.toLowerCase(), { name: '', email: '', phone: '', department: '', designation: '' }]));
+
   const results: EmployeeImportRowResult[] = [];
   const seenFileEmployeeIds = new Set<string>();
   const duplicateFileEmployeeIds = new Set<string>();
 
-  // Pass 1: Identify duplicates within the file
   for (const row of rawRows) {
     let empId = '';
     for (const [rawHeader, field] of Object.entries(headerMapping)) {
       if (field === 'employeeId' && row[rawHeader] !== undefined && row[rawHeader] !== null) {
-        empId = String(row[rawHeader]).trim();
+        empId = sanitizeCellString(row[rawHeader]);
         break;
       }
     }
@@ -89,13 +124,15 @@ export function validateImportRows(
     }
   }
 
+  let newCount = 0;
+  let updatedCount = 0;
+  let unchangedCount = 0;
   let readyCount = 0;
   let alreadyImportedCount = 0;
   let needsAttentionCount = 0;
 
-  // Pass 2: Validate each row
   rawRows.forEach((row, index) => {
-    const rowIndex = index + 2; // 1-based row index (accounting for header at row 1)
+    const rowIndex = index + 2;
     const errors: string[] = [];
     const warnings: string[] = [];
 
@@ -104,17 +141,18 @@ export function validateImportRows(
     let email = '';
     let phone = '';
     let department = '';
+    let designation = '';
 
     for (const [rawHeader, field] of Object.entries(headerMapping)) {
-      const val = row[rawHeader] !== undefined && row[rawHeader] !== null ? String(row[rawHeader]).trim() : '';
+      const val = sanitizeCellString(row[rawHeader], field === 'phone');
       if (field === 'employeeId') employeeId = val;
       if (field === 'fullName') fullName = val;
       if (field === 'email') email = val;
       if (field === 'phone') phone = val;
       if (field === 'department') department = val;
+      if (field === 'designation') designation = val;
     }
 
-    // Required Field Checks
     if (!employeeId) {
       errors.push('Employee ID is required.');
     }
@@ -127,12 +165,10 @@ export function validateImportRows(
       errors.push('Email address is invalid.');
     }
 
-    // File Duplicate Check
     if (employeeId && duplicateFileEmployeeIds.has(employeeId.toLowerCase())) {
       errors.push('Employee ID already appears in this file.');
     }
 
-    // Optional Warnings
     if (!phone) {
       warnings.push('Phone number is missing.');
     }
@@ -140,16 +176,37 @@ export function validateImportRows(
       warnings.push('Department is missing.');
     }
 
-    let status: ImportRowStatus = 'READY';
+    let status: ImportRowStatus = 'NEW';
 
     if (errors.length > 0) {
       status = 'NEEDS_ATTENTION';
       needsAttentionCount++;
-    } else if (existingEmployeeIds.has(employeeId.toLowerCase())) {
-      status = 'ALREADY_IMPORTED';
-      alreadyImportedCount++;
     } else {
-      readyCount++;
+      const existing = existingMap.get(employeeId.toLowerCase());
+      if (!existing && !isSetInput) {
+        status = 'NEW';
+        newCount++;
+        readyCount++;
+      } else if (!existing && isSetInput && !existingEmployeesInput.has(employeeId.toLowerCase())) {
+        status = 'READY';
+        readyCount++;
+      } else {
+        const hasNameChange = Boolean(fullName && existing && existing.name && fullName !== existing.name);
+        const hasEmailChange = Boolean(email && existing && existing.email && email !== existing.email);
+        const hasPhoneChange = Boolean(phone && existing && existing.phone && phone !== existing.phone);
+        const hasDeptChange = Boolean(department && existing && existing.department && department !== existing.department);
+        const hasDesigChange = Boolean(designation && existing && existing.designation && designation !== existing.designation);
+
+        if (hasNameChange || hasEmailChange || hasPhoneChange || hasDeptChange || hasDesigChange) {
+          status = 'UPDATED';
+          updatedCount++;
+          readyCount++;
+        } else {
+          status = isSetInput ? 'ALREADY_IMPORTED' : 'UNCHANGED';
+          unchangedCount++;
+          alreadyImportedCount++;
+        }
+      }
     }
 
     results.push({
@@ -162,7 +219,7 @@ export function validateImportRows(
         email,
         phone,
         department,
-        designation: '',
+        designation,
       },
       errors,
       warnings,
@@ -171,9 +228,12 @@ export function validateImportRows(
 
   return {
     totalRows: rawRows.length,
+    newCount,
+    updatedCount,
+    unchangedCount,
+    needsAttentionCount,
     readyCount,
     alreadyImportedCount,
-    needsAttentionCount,
     missingRequiredColumns: [],
     detectedColumns: Object.keys(headerMapping),
     rows: results,

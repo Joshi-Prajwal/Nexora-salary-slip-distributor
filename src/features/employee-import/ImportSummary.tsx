@@ -7,18 +7,22 @@ interface ImportSummaryProps {
 
 export const ImportSummary: React.FC<ImportSummaryProps> = ({ summary }) => {
   return (
-    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 p-3.5 bg-slate-50 border border-slate-200/80 rounded-xl">
+    <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 p-3.5 bg-slate-50 border border-slate-200/80 rounded-xl">
       <div className="p-2.5 bg-white border border-slate-200/60 rounded-lg">
         <span className="text-[11px] font-medium text-slate-500 block">Total Rows</span>
         <span className="text-lg font-bold text-slate-900 mt-0.5 block">{summary.totalRows}</span>
       </div>
       <div className="p-2.5 bg-emerald-50/50 border border-emerald-200/60 rounded-lg">
-        <span className="text-[11px] font-medium text-emerald-700 block">Ready to Import</span>
-        <span className="text-lg font-bold text-emerald-800 mt-0.5 block">{summary.readyCount}</span>
+        <span className="text-[11px] font-medium text-emerald-700 block">New Employees</span>
+        <span className="text-lg font-bold text-emerald-800 mt-0.5 block">{summary.newCount}</span>
       </div>
       <div className="p-2.5 bg-sky-50/50 border border-sky-200/60 rounded-lg">
-        <span className="text-[11px] font-medium text-sky-700 block">Already Imported</span>
-        <span className="text-lg font-bold text-sky-800 mt-0.5 block">{summary.alreadyImportedCount}</span>
+        <span className="text-[11px] font-medium text-sky-700 block">Updates</span>
+        <span className="text-lg font-bold text-sky-800 mt-0.5 block">{summary.updatedCount}</span>
+      </div>
+      <div className="p-2.5 bg-slate-100/70 border border-slate-200 rounded-lg">
+        <span className="text-[11px] font-medium text-slate-600 block">Unchanged</span>
+        <span className="text-lg font-bold text-slate-700 mt-0.5 block">{summary.unchangedCount}</span>
       </div>
       <div className="p-2.5 bg-amber-50/50 border border-amber-200/60 rounded-lg">
         <span className="text-[11px] font-medium text-amber-700 block">Needs Attention</span>

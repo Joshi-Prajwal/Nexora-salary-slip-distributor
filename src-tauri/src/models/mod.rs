@@ -9,7 +9,7 @@ pub use delivery::{DeliveryBatchSummary, DeliveryChannel, DeliveryPreview, Deliv
 pub use employee::{CreateEmployeeInput, Employee};
 pub use mapping::Mapping;
 pub use message_log::MessageLog;
-pub use salary_slip::{ExtractionSummary, OcrBatchSummary, SalarySlip, ScanSummary};
+pub use salary_slip::{BulkConfirmResult, ExtractionSummary, OcrBatchSummary, SalarySlip, ScanSummary};
 pub use settings::{
     AppSettings, AppSettingsResponse, ConnectionTestResult, EmailConfig, EmailConfigResponse,
     MessageTemplateConfig, SaveAppSettingsPayload, SaveEmailPayload, SaveTemplatePayload,

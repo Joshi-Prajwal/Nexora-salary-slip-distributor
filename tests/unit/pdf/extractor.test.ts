@@ -17,6 +17,8 @@ describe('Phase 3 Final Fix — PDF Identifier Extraction & Status Verification'
       extractionMethod: 'NOT_IDENTIFIED',
       matchConfidence: 0.0,
       matchStatus: 'UNMATCHED',
+      approvalStatus: 'PENDING',
+      ocrStatus: 'NOT_REQUIRED',
       createdAt: '1000',
       updatedAt: '1000',
     };
@@ -38,6 +40,8 @@ describe('Phase 3 Final Fix — PDF Identifier Extraction & Status Verification'
       extractionMethod: 'NOT_IDENTIFIED',
       matchConfidence: 0.0,
       matchStatus: 'UNMATCHED',
+      approvalStatus: 'PENDING',
+      ocrStatus: 'NOT_REQUIRED',
       createdAt: '1000',
       updatedAt: '1000',
     };
@@ -58,6 +62,8 @@ describe('Phase 3 Final Fix — PDF Identifier Extraction & Status Verification'
       extractionMethod: 'NOT_IDENTIFIED',
       matchConfidence: 0.0,
       matchStatus: 'UNMATCHED',
+      approvalStatus: 'PENDING',
+      ocrStatus: 'NOT_REQUIRED',
       createdAt: '1000',
       updatedAt: '1000',
     };
@@ -77,6 +83,8 @@ describe('Phase 3 Final Fix — PDF Identifier Extraction & Status Verification'
       extractionMethod: 'NOT_IDENTIFIED',
       matchConfidence: 0.0,
       matchStatus: 'UNMATCHED',
+      approvalStatus: 'PENDING',
+      ocrStatus: 'NOT_REQUIRED',
       createdAt: '1000',
       updatedAt: '1000',
     };
@@ -96,6 +104,8 @@ describe('Phase 3 Final Fix — PDF Identifier Extraction & Status Verification'
       extractionMethod: 'NOT_IDENTIFIED',
       matchConfidence: 0.0,
       matchStatus: 'UNMATCHED',
+      approvalStatus: 'PENDING',
+      ocrStatus: 'NOT_REQUIRED',
       createdAt: '1000',
       updatedAt: '1000',
     };
@@ -117,6 +127,8 @@ describe('Phase 3 Final Fix — PDF Identifier Extraction & Status Verification'
       extractionMethod: 'NOT_IDENTIFIED',
       matchConfidence: 0.0,
       matchStatus: 'UNMATCHED',
+      approvalStatus: 'PENDING',
+      ocrStatus: 'NOT_REQUIRED',
       createdAt: '1000',
       updatedAt: '1000',
     };
@@ -137,6 +149,8 @@ describe('Phase 3 Final Fix — PDF Identifier Extraction & Status Verification'
       extractionMethod: 'NOT_IDENTIFIED',
       matchConfidence: 0.0,
       matchStatus: 'UNMATCHED',
+      approvalStatus: 'PENDING',
+      ocrStatus: 'NOT_REQUIRED',
       createdAt: '1000',
       updatedAt: '1000',
     };
@@ -160,6 +174,8 @@ describe('Phase 3 Final Fix — PDF Identifier Extraction & Status Verification'
       extractionMethod: 'NOT_IDENTIFIED',
       matchConfidence: 0.0,
       matchStatus: 'UNMATCHED',
+      approvalStatus: 'PENDING',
+      ocrStatus: 'NOT_REQUIRED',
       createdAt: '1000',
       updatedAt: '1000',
     };
@@ -182,6 +198,8 @@ describe('Phase 3 Final Fix — PDF Identifier Extraction & Status Verification'
       extractionMethod: 'NOT_IDENTIFIED',
       matchConfidence: 0.0,
       matchStatus: 'UNMATCHED',
+      approvalStatus: 'PENDING',
+      ocrStatus: 'NOT_REQUIRED',
       createdAt: '1000',
       updatedAt: '1000',
     };
@@ -202,6 +220,8 @@ describe('Phase 3 Final Fix — PDF Identifier Extraction & Status Verification'
       matchConfidence: 0.0,
       matchStatus: 'DUPLICATE_CONTENT',
       duplicateOfId: 'slip-canonical',
+      approvalStatus: 'PENDING',
+      ocrStatus: 'NOT_REQUIRED',
       createdAt: '1000',
       updatedAt: '1000',
     };
@@ -214,8 +234,8 @@ describe('Phase 3 Final Fix — PDF Identifier Extraction & Status Verification'
 
   it('11. Bulk extraction returns complete ExtractionSummary', async () => {
     const slips: SalarySlip[] = [
-      { id: '1', filePath: '/p1.pdf', fileName: '1.pdf', fileHash: 'h1', detectedEmployeeId: 'E1', extractionMethod: 'NOT_IDENTIFIED', matchConfidence: 0, matchStatus: 'IDENTIFIED', createdAt: '1', updatedAt: '1' },
-      { id: '2', filePath: '/p2.pdf', fileName: '2.pdf', fileHash: 'h2', detectedName: 'N2', extractionMethod: 'NOT_IDENTIFIED', matchConfidence: 0, matchStatus: 'PARTIALLY_IDENTIFIED', createdAt: '1', updatedAt: '1' },
+      { id: '1', filePath: '/p1.pdf', fileName: '1.pdf', fileHash: 'h1', detectedEmployeeId: 'E1', extractionMethod: 'NOT_IDENTIFIED', matchConfidence: 0, matchStatus: 'IDENTIFIED', approvalStatus: 'PENDING', ocrStatus: 'NOT_REQUIRED', createdAt: '1', updatedAt: '1' },
+      { id: '2', filePath: '/p2.pdf', fileName: '2.pdf', fileHash: 'h2', detectedName: 'N2', extractionMethod: 'NOT_IDENTIFIED', matchConfidence: 0, matchStatus: 'PARTIALLY_IDENTIFIED', approvalStatus: 'PENDING', ocrStatus: 'NOT_REQUIRED', createdAt: '1', updatedAt: '1' },
     ];
     await salarySlipService.setMemoryStoreForTesting(slips);
 

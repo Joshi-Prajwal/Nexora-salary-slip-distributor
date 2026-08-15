@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { MatchingFilter, MatchCandidate, BatchMatchSummary } from '../types/matching';
+import { MatchingFilter, MatchCandidate, BatchMatchSummary, BulkConfirmResult } from '../types/matching';
 import { matchingService } from '../services/matchingService';
 import { useSalarySlipStore } from './salarySlipStore';
 
@@ -7,6 +7,7 @@ interface MatchingState {
   filter: MatchingFilter;
   isMatchingProcessing: boolean;
   lastBatchMatchSummary: BatchMatchSummary | null;
+  lastBulkConfirmResult: BulkConfirmResult | null;
   candidates: Record<string, MatchCandidate[]>;
   setFilter: (filter: MatchingFilter) => void;
   runMatching: () => Promise<BatchMatchSummary | null>;
@@ -14,12 +15,15 @@ interface MatchingState {
   confirmMatch: (slipId: string, employeeId: string, note?: string) => Promise<void>;
   rejectMatch: (slipId: string, note?: string) => Promise<void>;
   resetMatch: (slipId: string) => Promise<void>;
+  confirmAllSafeMatches: () => Promise<BulkConfirmResult | null>;
+  bulkUpdateApprovalStatus: (slipIds: string[], targetApproval: 'APPROVED' | 'REJECTED' | 'PENDING') => Promise<void>;
 }
 
 export const useMatchingStore = create<MatchingState>((set, get) => ({
   filter: {},
   isMatchingProcessing: false,
   lastBatchMatchSummary: null,
+  lastBulkConfirmResult: null,
   candidates: {},
   setFilter: (filter) => set({ filter }),
   runMatching: async () => {
@@ -59,5 +63,29 @@ export const useMatchingStore = create<MatchingState>((set, get) => ({
   resetMatch: async (slipId: string) => {
     await matchingService.resetMatch(slipId);
     await useSalarySlipStore.getState().fetchSalarySlips();
+  },
+  confirmAllSafeMatches: async () => {
+    set({ isMatchingProcessing: true });
+    try {
+      const result = await matchingService.confirmAllSafeMatches();
+      await useSalarySlipStore.getState().fetchSalarySlips();
+      set({
+        lastBulkConfirmResult: result,
+        isMatchingProcessing: false,
+      });
+      return result;
+    } catch {
+      set({ isMatchingProcessing: false });
+      return null;
+    }
+  },
+  bulkUpdateApprovalStatus: async (slipIds: string[], targetApproval: 'APPROVED' | 'REJECTED' | 'PENDING') => {
+    set({ isMatchingProcessing: true });
+    try {
+      await matchingService.bulkUpdateApprovalStatus(slipIds, targetApproval);
+      await useSalarySlipStore.getState().fetchSalarySlips();
+    } finally {
+      set({ isMatchingProcessing: false });
+    }
   },
 }));

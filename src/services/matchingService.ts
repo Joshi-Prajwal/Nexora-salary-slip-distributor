@@ -1,4 +1,4 @@
-import { MatchCandidate, BatchMatchSummary } from '../types/matching';
+import { MatchCandidate, BatchMatchSummary, BulkConfirmResult } from '../types/matching';
 import { SalarySlip } from '../types/salarySlip';
 import { salarySlipService } from './salarySlipService';
 
@@ -80,5 +80,68 @@ export const matchingService = {
     }
 
     return [];
+  },
+
+  async confirmAllSafeMatches(): Promise<BulkConfirmResult> {
+    const tauriResult = await tryTauriInvoke<BulkConfirmResult>('confirm_all_safe_matches');
+    if (tauriResult !== null) {
+      return tauriResult;
+    }
+
+    const slips = await salarySlipService.getSalarySlips();
+    let confirmedCount = 0;
+    let skippedCount = 0;
+    const skippedReasons: string[] = [];
+
+    const updatedSlips = slips.map((slip) => {
+      const isSafeExact = slip.matchStatus === 'EXACT_MATCH' && slip.matchedEmployeeId && slip.approvalStatus !== 'REJECTED';
+      if (isSafeExact) {
+        confirmedCount++;
+        return {
+          ...slip,
+          matchStatus: 'MANUALLY_CONFIRMED' as const,
+          approvalStatus: 'APPROVED' as const,
+          matchConfidence: 1.0,
+        };
+      } else {
+        skippedCount++;
+        skippedReasons.push(`${slip.fileName}: Safe criteria not met (${slip.matchStatus})`);
+        return slip;
+      }
+    });
+
+    await salarySlipService.setMemoryStoreForTesting(updatedSlips);
+
+    return {
+      confirmedCount,
+      skippedCount,
+      skippedReasons,
+      slips: updatedSlips,
+    };
+  },
+
+  async bulkUpdateApprovalStatus(slipIds: string[], targetApproval: 'APPROVED' | 'REJECTED' | 'PENDING'): Promise<SalarySlip[]> {
+    const tauriResult = await tryTauriInvoke<SalarySlip[]>('bulk_update_approval_status', {
+      slipIds,
+      targetApproval,
+    });
+    if (tauriResult !== null) {
+      return tauriResult;
+    }
+
+    const slips = await salarySlipService.getSalarySlips();
+    const updatedSlips = slips.map((slip) => {
+      if (slipIds.includes(slip.id)) {
+        return {
+          ...slip,
+          approvalStatus: targetApproval,
+          matchStatus: targetApproval === 'APPROVED' ? ('MANUALLY_CONFIRMED' as const) : targetApproval === 'REJECTED' ? ('MANUALLY_REJECTED' as const) : slip.matchStatus,
+        };
+      }
+      return slip;
+    });
+
+    await salarySlipService.setMemoryStoreForTesting(updatedSlips);
+    return updatedSlips;
   },
 };

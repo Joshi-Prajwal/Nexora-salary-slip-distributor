@@ -1,4 +1,4 @@
-import { SalarySlip, ScanSummary, ExtractionSummary, OcrBatchSummary } from '../types/salarySlip';
+import { SalarySlip, ScanSummary, ExtractionSummary, OcrBatchSummary, FolderScanDiagnostics } from '../types/salarySlip';
 
 let memorySalarySlipsStore: SalarySlip[] = [];
 
@@ -16,11 +16,15 @@ async function tryTauriInvoke<T>(cmd: string, args?: Record<string, any>): Promi
 
 /**
  * Salary Slip Application Service
- * Manages PDF directory scanning, SHA-256 metadata hashing, embedded text extraction, OCR fallback, matching, and SQLite record persistence
+ * Unified Ingestion Engine: Manages directory scanning, multi-PDF import, drag/drop ingestion, diagnostics, text extraction, OCR fallback, matching, and SQLite persistence.
  */
 export const salarySlipService = {
   async scanFolder(folderPath: string): Promise<ScanSummary> {
-    const tauriResult = await tryTauriInvoke<ScanSummary>('scan_salary_slips', { folderPath });
+    return this.ingestPaths([folderPath]);
+  },
+
+  async ingestPaths(paths: string[]): Promise<ScanSummary> {
+    const tauriResult = await tryTauriInvoke<ScanSummary>('ingest_salary_slips', { paths });
     if (tauriResult !== null) {
       return tauriResult;
     }
@@ -33,8 +37,43 @@ export const salarySlipService = {
       updatedCount: 0,
       unchangedCount: slips.length,
       duplicateCount: 0,
-      folderPath,
+      folderPath: paths[0] || 'Import Batch',
+      displayName: paths.length === 1 ? paths[0].split(/[/\\]/).pop() || 'Import Batch' : `Import Batch (${paths.length} items)`,
+      directoriesScanned: 1,
+      filesScanned: slips.length,
+      scanErrors: [],
       slips,
+    };
+  },
+
+  async diagnoseFolder(folderPath: string): Promise<FolderScanDiagnostics> {
+    const tauriResult = await tryTauriInvoke<FolderScanDiagnostics>('diagnose_folder', { folderPath });
+    if (tauriResult !== null) {
+      return tauriResult;
+    }
+
+    const slips = [...memorySalarySlipsStore];
+    return {
+      selectedPath: folderPath,
+      displayName: folderPath.split(/[/\\]/).pop() || folderPath,
+      exists: true,
+      isDirectory: true,
+      readable: true,
+      pdfCount: slips.length,
+      directoriesScanned: 1,
+      filesScanned: slips.length,
+      databaseRecords: slips.length,
+      scanErrors: [],
+      files: slips.map((s) => ({
+        filePath: s.filePath,
+        fileName: s.fileName,
+        fileExtension: 'pdf',
+        fileSize: 1024,
+        modifiedAt: s.createdAt,
+        fileHash: s.fileHash,
+        month: s.month,
+        year: s.year,
+      })),
     };
   },
 
@@ -161,6 +200,15 @@ export const salarySlipService = {
     };
   },
 
+  async runForceOcrBatch(): Promise<OcrBatchSummary> {
+    const tauriResult = await tryTauriInvoke<OcrBatchSummary>('run_force_ocr_batch');
+    if (tauriResult !== null) {
+      return tauriResult;
+    }
+
+    return this.runBatchOcrFallback();
+  },
+
   async confirmMatch(slipId: string, employeeId: string, note?: string): Promise<SalarySlip | null> {
     const tauriResult = await tryTauriInvoke<SalarySlip>('confirm_salary_slip_match', {
       slipId,
@@ -177,6 +225,7 @@ export const salarySlipService = {
         ...memorySalarySlipsStore[index],
         matchedEmployeeId: employeeId,
         matchStatus: 'MANUALLY_CONFIRMED',
+        approvalStatus: 'APPROVED',
         matchConfidence: 1.0,
         reviewedAt: `${Date.now()}`,
         reviewNote: note,
@@ -202,6 +251,7 @@ export const salarySlipService = {
         ...memorySalarySlipsStore[index],
         matchedEmployeeId: undefined,
         matchStatus: 'MANUALLY_REJECTED',
+        approvalStatus: 'REJECTED',
         matchConfidence: 0.0,
         reviewedAt: `${Date.now()}`,
         reviewNote: note,
@@ -226,6 +276,7 @@ export const salarySlipService = {
         ...memorySalarySlipsStore[index],
         matchedEmployeeId: undefined,
         matchStatus: 'UNMATCHED',
+        approvalStatus: 'PENDING',
         matchConfidence: 0.0,
       };
       memorySalarySlipsStore[index] = updated;
@@ -242,6 +293,19 @@ export const salarySlipService = {
 
     memorySalarySlipsStore = memorySalarySlipsStore.filter((s) => s.id !== id);
     return true;
+  },
+
+  async removeRecordsBatch(ids: string[]): Promise<number> {
+    if (ids.length === 0) return 0;
+    const tauriResult = await tryTauriInvoke<number>('remove_salary_slips_batch', { ids });
+    if (tauriResult !== null) {
+      return tauriResult;
+    }
+
+    const initialLength = memorySalarySlipsStore.length;
+    const idsSet = new Set(ids);
+    memorySalarySlipsStore = memorySalarySlipsStore.filter((s) => !idsSet.has(s.id));
+    return initialLength - memorySalarySlipsStore.length;
   },
 
   async setMemoryStoreForTesting(slips: SalarySlip[]): Promise<void> {

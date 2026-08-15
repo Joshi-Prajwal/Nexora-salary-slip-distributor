@@ -1,3 +1,5 @@
+import { SalarySlip } from './salarySlip';
+
 export type MatchStatus =
   | 'EXACT_MATCH'
   | 'STRONG_MATCH'
@@ -41,6 +43,13 @@ export interface BatchMatchSummary {
   conflicts: number;
   noMatches: number;
   alreadyReviewed: number;
+}
+
+export interface BulkConfirmResult {
+  confirmedCount: number;
+  skippedCount: number;
+  skippedReasons: string[];
+  slips: SalarySlip[];
 }
 
 export interface MatchingFilter {

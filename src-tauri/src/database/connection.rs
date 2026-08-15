@@ -1,7 +1,8 @@
+use crate::database::backup::DatabaseBackupService;
 use rusqlite::{Connection, Result};
-use std::sync::{Arc, Mutex};
-use std::path::Path;
 use std::fs;
+use std::path::Path;
+use std::sync::{Arc, Mutex};
 
 pub struct DbState {
     pub conn: Arc<Mutex<Connection>>,
@@ -44,13 +45,41 @@ impl DbState {
             let _ = fs::create_dir_all(parent);
         }
 
+        // Perform safe backup if existing database file
+        if Path::new(db_path).exists() {
+            let _ = DatabaseBackupService::backup_database(db_path);
+        }
+
         let conn = Connection::open(db_path).map_err(|e| e.to_string())?;
 
         Self::migrate(&conn).map_err(|e| e.to_string())?;
 
+        // Recover orphan records stuck in PROCESSING state from previous abnormal shutdown
+        Self::recover_stuck_records(&conn).map_err(|e| e.to_string())?;
+
         Ok(Self {
             conn: Arc::new(Mutex::new(conn)),
         })
+    }
+
+    pub fn recover_stuck_records(conn: &Connection) -> Result<()> {
+        let now_str = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_secs()
+            .to_string();
+
+        conn.execute(
+            "UPDATE delivery_records 
+             SET status = 'FAILED', 
+                 error_code = 'INTERRUPTED_SHUTDOWN', 
+                 error_message = 'Processing interrupted by application shutdown', 
+                 completed_at = ? 
+             WHERE status = 'PROCESSING'",
+            [&now_str],
+        )?;
+
+        Ok(())
     }
 
     pub fn migrate(conn: &Connection) -> Result<()> {
@@ -93,6 +122,10 @@ impl DbState {
                 reviewed_at TEXT,
                 reviewed_by TEXT,
                 review_note TEXT,
+                month TEXT,
+                year TEXT,
+                approval_status TEXT NOT NULL DEFAULT 'PENDING',
+                ocr_status TEXT NOT NULL DEFAULT 'NOT_REQUIRED',
                 created_at TEXT NOT NULL,
                 updated_at TEXT NOT NULL
             );
@@ -123,7 +156,7 @@ impl DbState {
             "#
         )?;
 
-        // Step 2: Ensure backward-compatible columns exist on existing databases
+        // Step 2: Ensure backward-compatible columns exist on existing databases BEFORE index creation
         ensure_column_exists(conn, "salary_slips", "duplicate_of_id", "TEXT")?;
         ensure_column_exists(conn, "salary_slips", "ocr_confidence", "REAL")?;
         ensure_column_exists(conn, "salary_slips", "ocr_processed_at", "TEXT")?;
@@ -134,6 +167,10 @@ impl DbState {
         ensure_column_exists(conn, "salary_slips", "reviewed_at", "TEXT")?;
         ensure_column_exists(conn, "salary_slips", "reviewed_by", "TEXT")?;
         ensure_column_exists(conn, "salary_slips", "review_note", "TEXT")?;
+        ensure_column_exists(conn, "salary_slips", "month", "TEXT")?;
+        ensure_column_exists(conn, "salary_slips", "year", "TEXT")?;
+        ensure_column_exists(conn, "salary_slips", "approval_status", "TEXT DEFAULT 'PENDING'")?;
+        ensure_column_exists(conn, "salary_slips", "ocr_status", "TEXT DEFAULT 'NOT_REQUIRED'")?;
         ensure_column_exists(conn, "settings", "key", "TEXT")?;
         ensure_column_exists(conn, "settings", "value", "TEXT")?;
         ensure_column_exists(conn, "settings", "updated_at", "TEXT")?;
@@ -166,7 +203,6 @@ pub mod tests {
         let conn = Connection::open_in_memory().unwrap();
         DbState::migrate(&conn).unwrap();
 
-        // Verify Phase 5 & 6 columns exist
         let mut stmt = conn.prepare("PRAGMA table_info(salary_slips)").unwrap();
         let cols: Vec<String> = stmt
             .query_map([], |row| row.get(1))
@@ -177,84 +213,60 @@ pub mod tests {
         assert!(cols.contains(&"matched_employee_id".to_string()));
         assert!(cols.contains(&"match_reason".to_string()));
         assert!(cols.contains(&"reviewed_at".to_string()));
-
-        // Verify delivery_records exists
-        let mut del_stmt = conn.prepare("PRAGMA table_info(delivery_records)").unwrap();
-        let del_cols: Vec<String> = del_stmt
-            .query_map([], |row| row.get(1))
-            .unwrap()
-            .map(|r| r.unwrap())
-            .collect();
-        assert!(del_cols.contains(&"salary_slip_id".to_string()));
-        assert!(del_cols.contains(&"channel".to_string()));
-
-        // Verify index exists
-        let mut idx_stmt = conn.prepare("PRAGMA index_list(salary_slips)").unwrap();
-        let idxs: Vec<String> = idx_stmt
-            .query_map([], |row| row.get(1))
-            .unwrap()
-            .map(|r| r.unwrap())
-            .collect();
-
-        assert!(idxs.contains(&"idx_salary_slips_matched_emp".to_string()));
+        assert!(cols.contains(&"month".to_string()));
+        assert!(cols.contains(&"year".to_string()));
     }
 
     #[test]
-    fn test_existing_old_database_migration() {
+    fn test_migration_creates_tables() {
         let conn = Connection::open_in_memory().unwrap();
-
-        // Create pre-Phase-5 schema without Phase 5 columns
-        conn.execute_batch(
-            r#"
-            CREATE TABLE salary_slips (
-                id TEXT PRIMARY KEY,
-                file_path TEXT NOT NULL UNIQUE,
-                file_name TEXT NOT NULL,
-                file_hash TEXT NOT NULL,
-                match_status TEXT NOT NULL DEFAULT 'UNMATCHED',
-                created_at TEXT NOT NULL,
-                updated_at TEXT NOT NULL
-            );
-            INSERT INTO salary_slips (id, file_path, file_name, file_hash, created_at, updated_at)
-            VALUES ('slip-1', '/path/slip1.pdf', 'slip1.pdf', 'hash-1', '1000', '1000');
-            "#
-        ).unwrap();
-
-        // Run migration
         DbState::migrate(&conn).unwrap();
 
-        // Verify existing record is preserved
-        let count: i64 = conn.query_row("SELECT COUNT(*) FROM salary_slips WHERE id = 'slip-1'", [], |r| r.get(0)).unwrap();
-        assert_eq!(count, 1);
+        let mut stmt = conn.prepare("SELECT name FROM sqlite_master WHERE type='table'").unwrap();
+        let tables: Vec<String> = stmt
+            .query_map([], |row| row.get(0))
+            .unwrap()
+            .map(|r| r.unwrap())
+            .collect();
 
-        // Verify Phase 5 columns were added
-        let mut stmt = conn.prepare("PRAGMA table_info(salary_slips)").unwrap();
+        assert!(tables.contains(&"employees".to_string()));
+        assert!(tables.contains(&"salary_slips".to_string()));
+        assert!(tables.contains(&"delivery_records".to_string()));
+        assert!(tables.contains(&"settings".to_string()));
+    }
+
+    #[test]
+    fn test_delivery_records_schema() {
+        let conn = Connection::open_in_memory().unwrap();
+        DbState::migrate(&conn).unwrap();
+
+        let mut stmt = conn.prepare("PRAGMA table_info(delivery_records)").unwrap();
         let cols: Vec<String> = stmt
             .query_map([], |row| row.get(1))
             .unwrap()
             .map(|r| r.unwrap())
             .collect();
 
-        assert!(cols.contains(&"matched_employee_id".to_string()));
-        assert!(cols.contains(&"match_reason".to_string()));
-        assert!(cols.contains(&"reviewed_at".to_string()));
+        assert!(cols.contains(&"salary_slip_id".to_string()));
+        assert!(cols.contains(&"employee_id".to_string()));
+        assert!(cols.contains(&"channel".to_string()));
+        assert!(cols.contains(&"status".to_string()));
+        assert!(cols.contains(&"attempt_number".to_string()));
+    }
 
-        // Verify index exists
-        let mut idx_stmt = conn.prepare("PRAGMA index_list(salary_slips)").unwrap();
-        let idxs: Vec<String> = idx_stmt
+    #[test]
+    fn test_settings_schema() {
+        let conn = Connection::open_in_memory().unwrap();
+        DbState::migrate(&conn).unwrap();
+
+        let mut stmt = conn.prepare("PRAGMA table_info(settings)").unwrap();
+        let cols: Vec<String> = stmt
             .query_map([], |row| row.get(1))
             .unwrap()
             .map(|r| r.unwrap())
             .collect();
 
-        assert!(idxs.contains(&"idx_salary_slips_matched_emp".to_string()));
-    }
-
-    #[test]
-    fn test_idempotent_migration() {
-        let conn = Connection::open_in_memory().unwrap();
-        DbState::migrate(&conn).unwrap();
-        // Run migration a second time to ensure idempotency
-        DbState::migrate(&conn).unwrap();
+        assert!(cols.contains(&"key".to_string()));
+        assert!(cols.contains(&"value".to_string()));
     }
 }

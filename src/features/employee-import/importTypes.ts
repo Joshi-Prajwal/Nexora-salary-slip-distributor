@@ -1,4 +1,4 @@
-export type ImportRowStatus = 'READY' | 'ALREADY_IMPORTED' | 'NEEDS_ATTENTION';
+export type ImportRowStatus = 'NEW' | 'UPDATED' | 'UNCHANGED' | 'NEEDS_ATTENTION' | 'READY' | 'ALREADY_IMPORTED';
 
 export interface RawRowData {
   [key: string]: any;
@@ -24,9 +24,12 @@ export interface EmployeeImportRowResult {
 
 export interface EmployeeImportSummary {
   totalRows: number;
+  newCount: number;
+  updatedCount: number;
+  unchangedCount: number;
+  needsAttentionCount: number;
   readyCount: number;
   alreadyImportedCount: number;
-  needsAttentionCount: number;
   missingRequiredColumns: string[];
   detectedColumns: string[];
   rows: EmployeeImportRowResult[];

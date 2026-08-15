@@ -196,8 +196,8 @@ impl EmailProvider for SmtpEmailProvider {
             .subject(if subject.trim().is_empty() { "Salary Slip" } else { subject });
 
         let body_part = SinglePart::plain(body.to_string());
-        let attachment_part = Attachment::new(file_name.to_string())
-            .body(pdf_bytes, ContentType::parse("application/pdf").unwrap());
+        let content_type = ContentType::parse("application/pdf").unwrap_or(ContentType::TEXT_PLAIN);
+        let attachment_part = Attachment::new(file_name.to_string()).body(pdf_bytes, content_type);
 
         let email_msg = match email_builder.multipart(MultiPart::mixed().singlepart(body_part).singlepart(attachment_part)) {
             Ok(msg) => msg,

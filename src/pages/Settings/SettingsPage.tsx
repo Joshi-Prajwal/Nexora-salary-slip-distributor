@@ -201,7 +201,7 @@ export const SettingsPage: React.FC = () => {
         title="Settings"
         subtitle="Manage company profile, SMTP email server, and WhatsApp Business API settings."
         action={
-          <Button variant="primary" isLoading={isSaving} onClick={handleSave}>
+          <Button variant="primary" isLoading={isSaving} disabled={isSaving || isTesting || isSendingTest} onClick={handleSave}>
             Save Changes
           </Button>
         }
@@ -261,10 +261,10 @@ export const SettingsPage: React.FC = () => {
                   <AlertTriangle className="w-3.5 h-3.5" /> Not Configured
                 </span>
               )}
-              <Button variant="outline" size="sm" isLoading={isTesting} onClick={handleTestEmail}>
+              <Button variant="outline" size="sm" isLoading={isTesting} disabled={isSaving || isTesting || isSendingTest} onClick={handleTestEmail}>
                 Test Connection
               </Button>
-              <Button variant="primary" size="sm" icon={<Send className="w-3.5 h-3.5" />} isLoading={isSendingTest} onClick={handleSendTestEmail}>
+              <Button variant="primary" size="sm" icon={<Send className="w-3.5 h-3.5" />} isLoading={isSendingTest} disabled={isSaving || isTesting || isSendingTest} onClick={handleSendTestEmail}>
                 Send Test Email
               </Button>
             </div>

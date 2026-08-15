@@ -1,14 +1,13 @@
 import * as XLSX from 'xlsx';
 import { EmployeeImportSummary } from './importTypes';
 import { mapHeaders, validateImportRows } from './importValidator';
+import { Employee } from '../../types/employee';
 
 export interface ParseExcelOptions {
   existingEmployeeIds?: Set<string>;
+  existingEmployees?: Map<string, Employee> | Employee[];
 }
 
-/**
- * Reads an Excel workbook (.xlsx or .xls) locally and validates its contents.
- */
 export async function parseExcelWorkbook(
   data: ArrayBuffer | Uint8Array,
   options: ParseExcelOptions = {}
@@ -24,7 +23,6 @@ export async function parseExcelWorkbook(
     throw new Error('No employee data was found in this Excel file.');
   }
 
-  // Find the first non-empty worksheet
   let selectedSheet: XLSX.WorkSheet | null = null;
   for (const sheetName of workbook.SheetNames) {
     const sheet = workbook.Sheets[sheetName];
@@ -38,7 +36,6 @@ export async function parseExcelWorkbook(
     throw new Error('No employee data was found in this Excel file.');
   }
 
-  // Parse worksheet to raw JSON array of objects
   const rawRows: Record<string, any>[] = XLSX.utils.sheet_to_json(selectedSheet, {
     defval: '',
     raw: false,
@@ -48,20 +45,21 @@ export async function parseExcelWorkbook(
     throw new Error('No employee data was found in this Excel file.');
   }
 
-  // Detect raw headers from the first row object keys
   const rawHeaders = Object.keys(rawRows[0] || {});
   if (rawHeaders.length === 0) {
     throw new Error('No employee data was found in this Excel file.');
   }
 
-  // Map headers and validate required columns
   const { mapped, missingRequired } = mapHeaders(rawHeaders);
   if (missingRequired.length > 0) {
     const summary: EmployeeImportSummary = {
       totalRows: rawRows.length,
+      newCount: 0,
+      updatedCount: 0,
+      unchangedCount: 0,
+      needsAttentionCount: rawRows.length,
       readyCount: 0,
       alreadyImportedCount: 0,
-      needsAttentionCount: rawRows.length,
       missingRequiredColumns: missingRequired,
       detectedColumns: rawHeaders,
       rows: [],
@@ -69,7 +67,15 @@ export async function parseExcelWorkbook(
     return summary;
   }
 
-  // Run row validation & duplicate checks
-  const summary = validateImportRows(rawRows, mapped, options.existingEmployeeIds || new Set());
+  let existingInput: Set<string> | Map<string, any> = options.existingEmployeeIds || new Set();
+  if (options.existingEmployees) {
+    if (options.existingEmployees instanceof Map) {
+      existingInput = options.existingEmployees;
+    } else if (Array.isArray(options.existingEmployees)) {
+      existingInput = new Map(options.existingEmployees.map((e) => [e.employeeId.toLowerCase(), e]));
+    }
+  }
+
+  const summary = validateImportRows(rawRows, mapped, existingInput);
   return summary;
 }

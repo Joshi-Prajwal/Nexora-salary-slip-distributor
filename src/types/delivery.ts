@@ -6,6 +6,7 @@ export interface DeliveryRecord {
   id: string;
   salarySlipId: string;
   employeeId: string;
+  employeeName?: string;
   channel: string;
   status: DeliveryStatus;
   recipient: string;

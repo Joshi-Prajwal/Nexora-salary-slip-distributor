@@ -18,7 +18,22 @@ export type MatchStatus =
   | 'READY'
   | 'REVIEW_REQUIRED'
   | 'CONFIRMED'
-  | 'REJECTED';
+  | 'REJECTED'
+  | 'FILE_MISSING';
+
+export type ApprovalStatus = 'PENDING' | 'APPROVED' | 'REJECTED';
+export type OcrStatus =
+  | 'NOT_REQUIRED'
+  | 'PENDING'
+  | 'RUNNING'
+  | 'COMPLETED'
+  | 'COMPLETED_WITH_WARNINGS'
+  | 'UNAVAILABLE'
+  | 'RENDER_FAILED'
+  | 'ENGINE_ERROR'
+  | 'EMPTY_RESULT'
+  | 'TIMEOUT'
+  | 'FAILED';
 
 export interface SalarySlip {
   id: string;
@@ -31,7 +46,7 @@ export interface SalarySlip {
   detectedEmail?: string;
   extractionMethod: ExtractionMethod;
   extractedText?: string;
-  matchConfidence: number; // 0.0 to 1.0
+  matchConfidence: number;
   matchStatus: MatchStatus;
   duplicateOfId?: string;
   ocrConfidence?: number;
@@ -43,8 +58,43 @@ export interface SalarySlip {
   reviewedAt?: string;
   reviewedBy?: string;
   reviewNote?: string;
+  month?: string;
+  year?: string;
+  approvalStatus: ApprovalStatus;
+  ocrStatus: OcrStatus;
   createdAt: string;
   updatedAt: string;
+}
+
+export interface ScanError {
+  path: string;
+  errorKind: string;
+  message: string;
+}
+
+export interface DiscoveredFile {
+  filePath: string;
+  fileName: string;
+  fileExtension: string;
+  fileSize: number;
+  modifiedAt: string;
+  fileHash: string;
+  month?: string;
+  year?: string;
+}
+
+export interface FolderScanDiagnostics {
+  selectedPath: string;
+  displayName: string;
+  exists: boolean;
+  isDirectory: boolean;
+  readable: boolean;
+  pdfCount: number;
+  directoriesScanned: number;
+  filesScanned: number;
+  databaseRecords: number;
+  scanErrors: ScanError[];
+  files: DiscoveredFile[];
 }
 
 export interface ScanSummary {
@@ -55,6 +105,11 @@ export interface ScanSummary {
   unchangedCount: number;
   duplicateCount: number;
   folderPath: string;
+  displayName?: string;
+  directoriesScanned?: number;
+  filesScanned?: number;
+  scanErrors?: (string | ScanError)[];
+  files?: DiscoveredFile[];
   slips: SalarySlip[];
 }
 

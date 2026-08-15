@@ -85,3 +85,15 @@ impl WhatsAppProvider for OfficialCloudApiWhatsAppProvider {
         Ok(true)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_whatsapp_provider_validation() {
+        let provider = OfficialCloudApiWhatsAppProvider::new();
+        assert!(provider.validate_configuration("https://graph.facebook.com", "token123", "phone123").is_ok());
+        assert!(provider.validate_configuration("", "token123", "phone123").is_err());
+    }
+}

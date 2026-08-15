@@ -32,20 +32,11 @@ export const SendingPage: React.FC = () => {
   }, [fetchSalarySlips]);
 
   const approvedSlips = slips.filter(
-    (s) =>
-      s.matchStatus === 'EXACT_MATCH' ||
-      s.matchStatus === 'STRONG_MATCH' ||
-      s.matchStatus === 'MANUALLY_CONFIRMED' ||
-      s.matchStatus === 'CONFIRMED' ||
-      s.matchStatus === 'READY'
+    (s) => s.approvalStatus === 'APPROVED' || s.matchStatus === 'MANUALLY_CONFIRMED'
   );
 
   const pendingReviewSlips = slips.filter(
-    (s) =>
-      s.matchStatus === 'POSSIBLE_MATCH' ||
-      s.matchStatus === 'CONFLICT' ||
-      s.matchStatus === 'MANUAL_REVIEW' ||
-      s.matchStatus === 'UNMATCHED'
+    (s) => s.approvalStatus === 'PENDING' || (s.approvalStatus !== 'APPROVED' && s.matchStatus !== 'MANUALLY_CONFIRMED')
   );
 
   const handleOpenPreview = async () => {
@@ -85,7 +76,7 @@ export const SendingPage: React.FC = () => {
             <h4 className="text-xl font-bold text-slate-900 mt-0.5">{approvedSlips.length} slips</h4>
           </div>
           <div>
-            <span className="text-xs text-slate-500 font-medium">Pending Review</span>
+            <span className="text-xs text-slate-500 font-medium">Pending Review / Unapproved</span>
             <h4 className="text-xl font-bold text-slate-700 mt-0.5">{pendingReviewSlips.length} slips</h4>
           </div>
           <div>
@@ -102,10 +93,17 @@ export const SendingPage: React.FC = () => {
           </div>
         </div>
 
-        {pendingReviewSlips.length > 0 && (
-          <div className="flex items-center gap-2 text-xs text-amber-800 bg-amber-50 p-3 rounded-lg border border-amber-200">
+        {approvedSlips.length === 0 && (
+          <div className="flex items-center gap-2 text-xs text-amber-800 bg-amber-50 p-3.5 rounded-lg border border-amber-200">
             <ShieldAlert className="w-4 h-4 text-amber-600 shrink-0" />
-            <span>{pendingReviewSlips.length} slips are pending human approval and will not be dispatched until reviewed.</span>
+            <span>0 salary slips are approved. Please go to the Review & Matching page to confirm and approve salary slips before sending.</span>
+          </div>
+        )}
+
+        {pendingReviewSlips.length > 0 && approvedSlips.length > 0 && (
+          <div className="flex items-center gap-2 text-xs text-slate-700 bg-slate-100 p-3 rounded-lg border border-slate-200">
+            <ShieldAlert className="w-4 h-4 text-slate-500 shrink-0" />
+            <span>{pendingReviewSlips.length} slips are pending approval and will be safely excluded from delivery.</span>
           </div>
         )}
       </Card>
@@ -204,7 +202,7 @@ export const SendingPage: React.FC = () => {
           isLoading={isSending}
           onClick={handleOpenPreview}
         >
-          Send Salary Slips
+          Send Salary Slips ({approvedSlips.length})
         </Button>
       </div>
 

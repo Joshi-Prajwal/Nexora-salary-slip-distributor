@@ -18,6 +18,7 @@ use tauri::Manager;
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_dialog::init())
         .setup(|app| {
             let app_dir = app.path().app_data_dir().unwrap_or_else(|_| std::path::PathBuf::from("."));
             let db_path = app_dir.join("nexora.db");
@@ -30,18 +31,25 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             commands::get_employees,
             commands::import_employees,
+            commands::replace_all_employees,
             commands::scan_salary_slips,
+            commands::ingest_salary_slips,
+            commands::diagnose_folder,
             commands::get_salary_slips,
             commands::extract_salary_slip_text,
             commands::extract_all_salary_slips,
             commands::run_ocr_fallback,
             commands::run_batch_ocr_fallback,
+            commands::run_force_ocr_batch,
             commands::run_matching_engine,
             commands::confirm_salary_slip_match,
             commands::reject_salary_slip_match,
             commands::reset_salary_slip_match,
             commands::get_match_candidates,
+            commands::confirm_all_safe_matches,
+            commands::bulk_update_approval_status,
             commands::remove_salary_slip_record,
+            commands::remove_salary_slips_batch,
             commands::preview_delivery_batch,
             commands::send_salary_slips_batch,
             commands::retry_delivery_record,

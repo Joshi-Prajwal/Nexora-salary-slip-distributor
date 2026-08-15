@@ -19,3 +19,13 @@ pub fn import_employees(
     let service = EmployeeService::new();
     service.import_employees(&mut conn, employees)
 }
+
+#[tauri::command]
+pub fn replace_all_employees(
+    state: State<'_, DbState>,
+    employees: Vec<CreateEmployeeInput>,
+) -> Result<usize, String> {
+    let mut conn = state.conn.lock().map_err(|e| e.to_string())?;
+    let service = EmployeeService::new();
+    service.replace_all_employees(&mut conn, employees)
+}

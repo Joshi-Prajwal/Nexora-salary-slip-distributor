@@ -94,4 +94,73 @@ describe('Phase 6 — Delivery Engine Unit Tests', () => {
     const invalid = await deliveryService.testWhatsappConnection('', '', '');
     expect(invalid).toBe(false);
   });
+
+  it('8. DeliveryRecord contains resolved employeeId and employeeName', async () => {
+    const sampleRecord: DeliveryRecord = {
+      id: 'del-101',
+      salarySlipId: 'slip-101',
+      employeeId: '106',
+      employeeName: 'V M Muttur',
+      channel: 'EMAIL',
+      status: 'SENT',
+      recipient: 'muttur.vm@company.com',
+      provider: 'SMTP',
+      attemptNumber: 1,
+      createdAt: '1000',
+    };
+    await deliveryService.setMemoryStoreForTesting([sampleRecord]);
+
+    const records = await deliveryService.getDeliveryRecords();
+    expect(records).toHaveLength(1);
+    expect(records[0].employeeId).toBe('106');
+    expect(records[0].employeeName).toBe('V M Muttur');
+  });
+
+  it('9. Derived statistics calculate total, delivered, pending, and failed with zero counter drift', async () => {
+    const records: DeliveryRecord[] = [
+      { id: '1', salarySlipId: 's1', employeeId: '106', employeeName: 'V M Muttur', channel: 'EMAIL', status: 'SENT', recipient: 'r1', provider: 'SMTP', attemptNumber: 1, createdAt: '1' },
+      { id: '2', salarySlipId: 's2', employeeId: '107', employeeName: 'H S Maheshnaik', channel: 'EMAIL', status: 'FAILED', recipient: 'r2', provider: 'SMTP', attemptNumber: 1, createdAt: '2' },
+      { id: '3', salarySlipId: 's3', employeeId: '108', employeeName: 'Dr L B Singh', channel: 'WHATSAPP', status: 'PENDING', recipient: 'r3', provider: 'WHATSAPP_CLOUD_API', attemptNumber: 1, createdAt: '3' },
+      { id: '4', salarySlipId: 's4', employeeId: '109', employeeName: 'Ashwini R Kulkarni', channel: 'EMAIL', status: 'SKIPPED', recipient: 'r4', provider: 'SMTP', attemptNumber: 1, createdAt: '4' },
+    ];
+    await deliveryService.setMemoryStoreForTesting(records);
+
+    const logs = await deliveryService.getDeliveryRecords();
+    const total = logs.length;
+    const delivered = logs.filter(r => r.status === 'SENT').length;
+    const pending = logs.filter(r => r.status === 'PENDING' || r.status === 'PROCESSING').length;
+    const failed = logs.filter(r => r.status === 'FAILED').length;
+    const skipped = logs.filter(r => r.status === 'SKIPPED').length;
+
+    expect(total).toBe(4);
+    expect(delivered).toBe(1);
+    expect(pending).toBe(1);
+    expect(failed).toBe(1);
+    expect(skipped).toBe(1);
+    expect(delivered + pending + failed + skipped).toBe(total);
+  });
+
+  it('10. Multi-field search matches employee ID, employee name, and recipient case-insensitively', async () => {
+    const records: DeliveryRecord[] = [
+      { id: '1', salarySlipId: 's1', employeeId: 'EMP-106', employeeName: 'V M Muttur', channel: 'EMAIL', status: 'SENT', recipient: 'muttur@company.com', provider: 'SMTP', attemptNumber: 1, createdAt: '1' },
+      { id: '2', salarySlipId: 's2', employeeId: 'EMP-107', employeeName: 'H S Maheshnaik', channel: 'EMAIL', status: 'FAILED', recipient: 'mahesh@company.com', provider: 'SMTP', attemptNumber: 1, createdAt: '2' },
+    ];
+    await deliveryService.setMemoryStoreForTesting(records);
+
+    const logs = await deliveryService.getDeliveryRecords();
+    
+    // Search by ID
+    const byId = logs.filter(r => r.employeeId.toLowerCase().includes('106'));
+    expect(byId).toHaveLength(1);
+    expect(byId[0].employeeName).toBe('V M Muttur');
+
+    // Search by Name
+    const byName = logs.filter(r => (r.employeeName || '').toLowerCase().includes('maheshnaik'));
+    expect(byName).toHaveLength(1);
+    expect(byName[0].employeeId).toBe('EMP-107');
+
+    // Search by Recipient
+    const byRecipient = logs.filter(r => r.recipient.toLowerCase().includes('muttur@'));
+    expect(byRecipient).toHaveLength(1);
+  });
 });

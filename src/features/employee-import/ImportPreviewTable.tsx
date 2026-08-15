@@ -12,23 +12,30 @@ export const ImportPreviewTable: React.FC<ImportPreviewTableProps> = ({ rows }) 
       key: 'status',
       header: 'Status',
       render: (item) => {
-        if (item.status === 'READY') {
+        if (item.status === 'NEW' || item.status === 'READY') {
           return (
             <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
-              Ready
+              NEW
             </span>
           );
         }
-        if (item.status === 'ALREADY_IMPORTED') {
+        if (item.status === 'UPDATED') {
           return (
             <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-sky-50 text-sky-700 border border-sky-200">
-              Already imported
+              UPDATED
+            </span>
+          );
+        }
+        if (item.status === 'UNCHANGED' || item.status === 'ALREADY_IMPORTED') {
+          return (
+            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-slate-100 text-slate-700 border border-slate-200">
+              UNCHANGED
             </span>
           );
         }
         return (
           <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-amber-50 text-amber-700 border border-amber-200">
-            Needs attention
+            NEEDS ATTENTION
           </span>
         );
       },
@@ -65,13 +72,16 @@ export const ImportPreviewTable: React.FC<ImportPreviewTableProps> = ({ rows }) 
         if (item.errors.length > 0) {
           return <span className="text-xs text-rose-600 font-medium">{item.errors.join(' ')}</span>;
         }
-        if (item.status === 'ALREADY_IMPORTED') {
-          return <span className="text-xs text-slate-400">Already imported</span>;
+        if (item.status === 'UPDATED') {
+          return <span className="text-xs text-sky-600 font-medium">Fields will be updated</span>;
+        }
+        if (item.status === 'UNCHANGED' || item.status === 'ALREADY_IMPORTED') {
+          return <span className="text-xs text-slate-400">No changes detected</span>;
         }
         if (item.warnings.length > 0) {
           return <span className="text-xs text-amber-600 font-medium">{item.warnings.join(' ')}</span>;
         }
-        return <span className="text-xs text-emerald-600 font-medium">Valid employee record</span>;
+        return <span className="text-xs text-emerald-600 font-medium">New employee record</span>;
       },
     },
   ];

@@ -11,3 +11,6 @@ pub use history_service::HistoryService;
 pub use matching_service::MatchingService;
 pub use salary_slip_service::SalarySlipService;
 pub use sending_service::SendingService;
+
+#[cfg(test)]
+mod multi_month_tests;

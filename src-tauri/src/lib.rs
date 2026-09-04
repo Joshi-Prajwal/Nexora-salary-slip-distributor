@@ -9,6 +9,7 @@ pub mod models;
 pub mod ocr;
 pub mod pdf;
 pub mod queue;
+pub mod security;
 pub mod services;
 
 use database::connection::DbState;

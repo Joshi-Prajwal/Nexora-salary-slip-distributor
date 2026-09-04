@@ -19,6 +19,8 @@ export interface DeliveryRecord {
   createdAt: string;
   startedAt?: string;
   completedAt?: string;
+  month?: string;
+  year?: string;
 }
 
 export interface DeliveryPreview {

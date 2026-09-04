@@ -7,7 +7,6 @@ import { CommunicationChannel } from '../types/messaging';
  */
 export const sendingService = {
   async queueBatch(_salarySlipIds: string[], _channel: CommunicationChannel): Promise<SendJob[]> {
-    console.log('[Phase 0 Scaffold] Queue batch send:', _salarySlipIds, _channel);
     return [];
   },
 
@@ -21,8 +20,7 @@ export const sendingService = {
     };
   },
 
-  async retryFailedJob(jobId: string): Promise<boolean> {
-    console.log('[Phase 0 Scaffold] Retry failed job:', jobId);
+  async retryFailedJob(_jobId: string): Promise<boolean> {
     return true;
   },
 };

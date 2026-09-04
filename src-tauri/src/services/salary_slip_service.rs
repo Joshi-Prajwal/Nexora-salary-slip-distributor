@@ -126,6 +126,8 @@ impl SalarySlipService {
                     Some(classification.document_type.as_str()),
                     Some(classification.confidence),
                     Some(ocr_target_status),
+                    parsed.month.as_deref(),
+                    parsed.year.as_deref(),
                 )?;
             }
             Err(_err) => {
@@ -148,6 +150,8 @@ impl SalarySlipService {
                     Some("UNKNOWN"),
                     Some(0.0),
                     Some("PENDING"),
+                    None,
+                    None,
                 )?;
             }
         }
@@ -256,6 +260,8 @@ impl SalarySlipService {
                     Some(classification.confidence),
                     Some(ocr_res.page_count as u32),
                     Some(duration_ms),
+                    parsed.month.as_deref(),
+                    parsed.year.as_deref(),
                 )?;
             }
             Err(ocr_err) => {
@@ -272,6 +278,8 @@ impl SalarySlipService {
                     crate::ocr::OcrError::UnsupportedDocument(_) => "RENDER_FAILED",
                 };
 
+                let fallback_method = if slip.extraction_method == "NOT_IDENTIFIED" { "NOT_IDENTIFIED" } else { &slip.extraction_method };
+
                 self.repo.update_ocr_result(
                     conn,
                     id,
@@ -280,7 +288,7 @@ impl SalarySlipService {
                     None,
                     None,
                     None,
-                    "NOT_IDENTIFIED",
+                    fallback_method,
                     ocr_status,
                     None,
                     Some(&err_msg),
@@ -288,6 +296,8 @@ impl SalarySlipService {
                     None,
                     None,
                     Some(duration_ms),
+                    None,
+                    None,
                 )?;
             }
         }
@@ -409,7 +419,7 @@ impl SalarySlipService {
         let mut already_reviewed = 0;
 
         for slip in &all_slips {
-            if slip.match_status == "MANUALLY_CONFIRMED" || slip.match_status == "MANUALLY_REJECTED" {
+            if slip.match_status == "MANUALLY_CONFIRMED" || slip.match_status == "MANUALLY_REJECTED" || slip.approval_status == "APPROVED" {
                 already_reviewed += 1;
                 continue;
             }
@@ -440,6 +450,8 @@ impl SalarySlipService {
                         None,
                         None,
                         None,
+                        slip.month.as_deref(),
+                        slip.year.as_deref(),
                     );
                 }
             }

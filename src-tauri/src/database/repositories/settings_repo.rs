@@ -1,4 +1,5 @@
 use rusqlite::{params, Connection, Result};
+use crate::security::CredentialStore;
 use crate::models::{
     AppSettingsResponse, EmailConfig, EmailConfigResponse, MessageTemplateConfig, SaveAppSettingsPayload,
     SaveEmailPayload, SaveTemplatePayload, SaveWhatsAppPayload, WhatsAppConfig, WhatsAppConfigResponse,
@@ -58,7 +59,12 @@ impl SettingsRepository {
 
     pub fn get_email_config(&self, conn: &Connection) -> Result<EmailConfig, String> {
         if let Some(json_str) = self.get_value(conn, "email_config")? {
-            if let Ok(config) = serde_json::from_str::<EmailConfig>(&json_str) {
+            if let Ok(mut config) = serde_json::from_str::<EmailConfig>(&json_str) {
+                if let Some(ref pwd) = config.password {
+                    if let Ok(decrypted) = CredentialStore::unprotect_secret(pwd) {
+                        config.password = Some(decrypted);
+                    }
+                }
                 return Ok(config);
             }
         }
@@ -113,7 +119,15 @@ impl SettingsRepository {
             current.enabled = !current.host.is_empty() && !current.username.is_empty();
         }
 
-        let json_str = serde_json::to_string(&current).map_err(|e| e.to_string())?;
+        // Encrypt password before persisting to SQLite
+        let mut to_store = current.clone();
+        if let Some(ref p) = to_store.password {
+            if let Ok(enc) = CredentialStore::protect_secret(p) {
+                to_store.password = Some(enc);
+            }
+        }
+
+        let json_str = serde_json::to_string(&to_store).map_err(|e| e.to_string())?;
         self.set_value(conn, "email_config", &json_str)?;
 
         Ok(current)
@@ -121,7 +135,12 @@ impl SettingsRepository {
 
     pub fn get_whatsapp_config(&self, conn: &Connection) -> Result<WhatsAppConfig, String> {
         if let Some(json_str) = self.get_value(conn, "whatsapp_config")? {
-            if let Ok(config) = serde_json::from_str::<WhatsAppConfig>(&json_str) {
+            if let Ok(mut config) = serde_json::from_str::<WhatsAppConfig>(&json_str) {
+                if let Some(ref tok) = config.api_token {
+                    if let Ok(decrypted) = CredentialStore::unprotect_secret(tok) {
+                        config.api_token = Some(decrypted);
+                    }
+                }
                 return Ok(config);
             }
         }
@@ -160,7 +179,15 @@ impl SettingsRepository {
             current.enabled = !current.api_url.is_empty() && !current.phone_number_id.is_empty();
         }
 
-        let json_str = serde_json::to_string(&current).map_err(|e| e.to_string())?;
+        // Encrypt token before persisting to SQLite
+        let mut to_store = current.clone();
+        if let Some(ref tok) = to_store.api_token {
+            if let Ok(enc) = CredentialStore::protect_secret(tok) {
+                to_store.api_token = Some(enc);
+            }
+        }
+
+        let json_str = serde_json::to_string(&to_store).map_err(|e| e.to_string())?;
         self.set_value(conn, "whatsapp_config", &json_str)?;
 
         Ok(current)
@@ -349,6 +376,10 @@ mod tests {
         assert_eq!(resp.email_config.username, "user@gmail.com");
         assert!(resp.email_config.has_password);
         assert!(resp.email_config.configured);
+
+        // 4. Verify raw database storage is encrypted and does not contain plaintext password
+        let raw_json = repo.get_value(&conn, "email_config").unwrap().unwrap();
+        assert!(!raw_json.contains("secret_app_password"));
     }
 
     #[test]
@@ -379,5 +410,9 @@ mod tests {
         let resp = repo.get_app_settings_response(&conn).unwrap();
         assert!(resp.whatsapp_config.has_access_token);
         assert!(resp.whatsapp_config.configured);
+
+        // Verify raw database storage is encrypted and does not contain plaintext token
+        let raw_json = repo.get_value(&conn, "whatsapp_config").unwrap().unwrap();
+        assert!(!raw_json.contains("EAAB_secret_meta_token"));
     }
 }

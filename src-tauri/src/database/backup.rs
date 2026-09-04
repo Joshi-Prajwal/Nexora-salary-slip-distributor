@@ -37,6 +37,9 @@ impl DatabaseBackupService {
         let backup_path = backups_dir.join(backup_filename);
 
         if let Err(e) = fs::copy(path, &backup_path) {
+            if backup_path.exists() {
+                let _ = fs::remove_file(&backup_path);
+            }
             return Err(format!("Failed to copy database for backup: {}", e));
         }
 

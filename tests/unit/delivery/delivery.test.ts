@@ -163,4 +163,62 @@ describe('Phase 6 — Delivery Engine Unit Tests', () => {
     const byRecipient = logs.filter(r => r.recipient.toLowerCase().includes('muttur@'));
     expect(byRecipient).toHaveLength(1);
   });
+
+  it('11. DeliveryRecord contains month and year period properties', async () => {
+    const sampleRecord: DeliveryRecord = {
+      id: 'del-sep-1',
+      salarySlipId: 'slip-sep-1',
+      employeeId: 'EMP001',
+      employeeName: 'Alice Smith',
+      channel: 'EMAIL',
+      status: 'SENT',
+      recipient: 'alice@company.com',
+      provider: 'SMTP',
+      attemptNumber: 1,
+      createdAt: '1000',
+      month: 'September',
+      year: '2026',
+    };
+    await deliveryService.setMemoryStoreForTesting([sampleRecord]);
+
+    const records = await deliveryService.getDeliveryRecords();
+    expect(records).toHaveLength(1);
+    expect(records[0].month).toBe('September');
+    expect(records[0].year).toBe('2026');
+  });
+
+  it('12. Delivery history records can be filtered by payroll period', async () => {
+    const records: DeliveryRecord[] = [
+      { id: '1', salarySlipId: 's1', employeeId: 'EMP001', channel: 'EMAIL', status: 'SENT', recipient: 'a@c.com', provider: 'SMTP', attemptNumber: 1, createdAt: '1', month: 'September', year: '2026' },
+      { id: '2', salarySlipId: 's2', employeeId: 'EMP001', channel: 'EMAIL', status: 'SENT', recipient: 'a@c.com', provider: 'SMTP', attemptNumber: 1, createdAt: '2', month: 'October', year: '2026' },
+      { id: '3', salarySlipId: 's3', employeeId: 'EMP002', channel: 'EMAIL', status: 'SENT', recipient: 'b@c.com', provider: 'SMTP', attemptNumber: 1, createdAt: '3', month: 'November', year: '2026' },
+    ];
+    await deliveryService.setMemoryStoreForTesting(records);
+
+    const logs = await deliveryService.getDeliveryRecords();
+    const sepLogs = logs.filter(r => r.month === 'September' && r.year === '2026');
+    const octLogs = logs.filter(r => r.month === 'October' && r.year === '2026');
+    const novLogs = logs.filter(r => r.month === 'November' && r.year === '2026');
+
+    expect(sepLogs).toHaveLength(1);
+    expect(octLogs).toHaveLength(1);
+    expect(novLogs).toHaveLength(1);
+  });
+
+  it('13. Multi-month dispatches for the same employee retain independent records', async () => {
+    const records: DeliveryRecord[] = [
+      { id: 'del-sep', salarySlipId: 'slip-sep', employeeId: 'EMP001', channel: 'EMAIL', status: 'SENT', recipient: 'alice@c.com', provider: 'SMTP', attemptNumber: 1, createdAt: '1000', month: 'September', year: '2026' },
+      { id: 'del-oct', salarySlipId: 'slip-oct', employeeId: 'EMP001', channel: 'EMAIL', status: 'SENT', recipient: 'alice@c.com', provider: 'SMTP', attemptNumber: 1, createdAt: '2000', month: 'October', year: '2026' },
+      { id: 'del-nov', salarySlipId: 'slip-nov', employeeId: 'EMP001', channel: 'EMAIL', status: 'SENT', recipient: 'alice@c.com', provider: 'SMTP', attemptNumber: 1, createdAt: '3000', month: 'November', year: '2026' },
+    ];
+    await deliveryService.setMemoryStoreForTesting(records);
+
+    const logs = await deliveryService.getDeliveryRecords();
+    const emp001Logs = logs.filter(r => r.employeeId === 'EMP001');
+
+    expect(emp001Logs).toHaveLength(3);
+    const periods = emp001Logs.map(r => `${r.month} ${r.year}`);
+    expect(periods).toEqual(['September 2026', 'October 2026', 'November 2026']);
+  });
 });
+

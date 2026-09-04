@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { PageHeader } from '../../components/common/PageHeader';
 import { Card } from '../../components/common/Card';
 import { Button } from '../../components/common/Button';
@@ -8,7 +8,7 @@ import { useSalarySlipStore } from '../../stores/salarySlipStore';
 import { useDeliveryStore } from '../../stores/deliveryStore';
 import { useAppStore } from '../../stores/appStore';
 import { DeliveryBatchSummary, DeliveryPreview } from '../../types/delivery';
-import { Mail, MessageSquare, Send, ShieldAlert, CheckCircle2, AlertTriangle, XCircle, RotateCcw } from 'lucide-react';
+import { Mail, MessageSquare, Send, ShieldAlert, CheckCircle2, AlertTriangle, XCircle, RotateCcw, Calendar } from 'lucide-react';
 
 export const SendingPage: React.FC = () => {
   const { setActivePage } = useAppStore();
@@ -22,6 +22,7 @@ export const SendingPage: React.FC = () => {
   } = useDeliveryStore();
 
   const [selectedChannel, setSelectedChannel] = useState<'EMAIL' | 'WHATSAPP' | 'BOTH' | null>(null);
+  const [selectedMonthFilter, setSelectedMonthFilter] = useState('ALL');
   const [isPreviewModalOpen, setIsPreviewModalOpen] = useState(false);
   const [activePreview, setActivePreview] = useState<DeliveryPreview | null>(null);
   const [batchSummary, setBatchSummary] = useState<DeliveryBatchSummary | null>(null);
@@ -31,13 +32,39 @@ export const SendingPage: React.FC = () => {
     fetchSalarySlips();
   }, [fetchSalarySlips]);
 
-  const approvedSlips = slips.filter(
-    (s) => s.approvalStatus === 'APPROVED' || s.matchStatus === 'MANUALLY_CONFIRMED'
-  );
+  // Extract distinct available periods from slips
+  const availableMonths = useMemo(() => {
+    const periodSet = new Set<string>();
+    slips.forEach((s) => {
+      if (s.month && s.year) {
+        periodSet.add(`${s.month} ${s.year}`);
+      } else if (s.month) {
+        periodSet.add(s.month);
+      }
+    });
+    return Array.from(periodSet).sort();
+  }, [slips]);
 
-  const pendingReviewSlips = slips.filter(
-    (s) => s.approvalStatus === 'PENDING' || (s.approvalStatus !== 'APPROVED' && s.matchStatus !== 'MANUALLY_CONFIRMED')
-  );
+  // Filter slips by selectedMonthFilter
+  const scopedSlips = useMemo(() => {
+    if (selectedMonthFilter === 'ALL') return slips;
+    return slips.filter((s) => {
+      const slipPeriod = s.month && s.year ? `${s.month} ${s.year}` : (s.month || '');
+      return slipPeriod === selectedMonthFilter;
+    });
+  }, [slips, selectedMonthFilter]);
+
+  const approvedSlips = useMemo(() => {
+    return scopedSlips.filter(
+      (s) => s.approvalStatus === 'APPROVED' || s.matchStatus === 'MANUALLY_CONFIRMED'
+    );
+  }, [scopedSlips]);
+
+  const pendingReviewSlips = useMemo(() => {
+    return scopedSlips.filter(
+      (s) => s.approvalStatus === 'PENDING' || (s.approvalStatus !== 'APPROVED' && s.matchStatus !== 'MANUALLY_CONFIRMED')
+    );
+  }, [scopedSlips]);
 
   const handleOpenPreview = async () => {
     if (!selectedChannel || approvedSlips.length === 0) return;
@@ -70,9 +97,34 @@ export const SendingPage: React.FC = () => {
 
       {/* Pre-Send Summary Card */}
       <Card title="Pre-Distribution Summary" subtitle="Review batch scope prior to sending">
+        {availableMonths.length > 0 && (
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3 bg-white border border-slate-200 rounded-lg mb-4">
+            <div className="flex items-center gap-2">
+              <Calendar className="w-4 h-4 text-sky-600 shrink-0" />
+              <span className="text-sm font-semibold text-slate-800">Target Payroll Period:</span>
+              <span className="text-xs text-slate-500 hidden md:inline">Only slips matching the selected period will be dispatched.</span>
+            </div>
+            <select
+              value={selectedMonthFilter}
+              onChange={(e) => setSelectedMonthFilter(e.target.value)}
+              disabled={isSending}
+              className="px-3 py-1.5 bg-white border border-slate-300 rounded-lg text-sm text-slate-700 font-medium focus:outline-none focus:ring-2 focus:ring-sky-500"
+            >
+              <option value="ALL">All Periods ({slips.length} total slips)</option>
+              {availableMonths.map((m) => (
+                <option key={m} value={m}>
+                  {m}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
+
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 p-4 bg-slate-50 border border-slate-200/80 rounded-lg mb-4">
           <div>
-            <span className="text-xs text-slate-500 font-medium">Approved & Ready to Send</span>
+            <span className="text-xs text-slate-500 font-medium">
+              Approved & Ready to Send {selectedMonthFilter !== 'ALL' ? `(${selectedMonthFilter})` : ''}
+            </span>
             <h4 className="text-xl font-bold text-slate-900 mt-0.5">{approvedSlips.length} slips</h4>
           </div>
           <div>
@@ -207,7 +259,7 @@ export const SendingPage: React.FC = () => {
           isLoading={isSending}
           onClick={handleOpenPreview}
         >
-          Send Salary Slips ({approvedSlips.length})
+          Send Salary Slips ({approvedSlips.length}){selectedMonthFilter !== 'ALL' ? ` • ${selectedMonthFilter}` : ''}
         </Button>
       </div>
 
@@ -219,7 +271,7 @@ export const SendingPage: React.FC = () => {
           onConfirm={handleConfirmSend}
           title="Confirm Salary Slip Batch Send"
           confirmLabel="Confirm & Start Sending"
-          message={`You are about to send ${approvedSlips.length} approved salary slips via ${selectedChannel}.`}
+          message={`You are about to send ${approvedSlips.length} approved salary slips via ${selectedChannel}${selectedMonthFilter !== 'ALL' ? ` for period ${selectedMonthFilter}` : ''}.`}
         >
           <div className="space-y-3 pt-3 text-xs text-slate-700">
             <div className="grid grid-cols-2 gap-2 p-3 bg-slate-50 border border-slate-200 rounded-lg">

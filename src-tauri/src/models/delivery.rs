@@ -74,6 +74,8 @@ pub struct DeliveryRecord {
     pub started_at: Option<String>,
     pub completed_at: Option<String>,
     pub employee_name: Option<String>,
+    pub month: Option<String>,
+    pub year: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

@@ -26,6 +26,8 @@ impl DeliveryRepository {
             started_at: row.get(13)?,
             completed_at: row.get(14)?,
             employee_name: row.get(15).ok(),
+            month: row.get(16).ok(),
+            year: row.get(17).ok(),
         })
     }
 
@@ -100,7 +102,9 @@ impl DeliveryRepository {
                 SELECT d.id, d.salary_slip_id, d.employee_id, d.channel, d.status, d.recipient, d.provider,
                        d.message, d.error_code, d.error_message, d.provider_message_id, d.attempt_number,
                        d.created_at, d.started_at, d.completed_at,
-                       COALESCE(e.name, s.detected_name) AS employee_name
+                       COALESCE(e.name, s.detected_name) AS employee_name,
+                       s.month AS salary_month,
+                       s.year AS salary_year
                 FROM delivery_records d
                 LEFT JOIN employees e ON d.employee_id = e.employee_id OR d.employee_id = e.id
                 LEFT JOIN salary_slips s ON d.salary_slip_id = s.id
@@ -129,7 +133,9 @@ impl DeliveryRepository {
                 SELECT d.id, d.salary_slip_id, d.employee_id, d.channel, d.status, d.recipient, d.provider,
                        d.message, d.error_code, d.error_message, d.provider_message_id, d.attempt_number,
                        d.created_at, d.started_at, d.completed_at,
-                       COALESCE(e.name, s.detected_name) AS employee_name
+                       COALESCE(e.name, s.detected_name) AS employee_name,
+                       s.month AS salary_month,
+                       s.year AS salary_year
                 FROM delivery_records d
                 LEFT JOIN employees e ON d.employee_id = e.employee_id OR d.employee_id = e.id
                 LEFT JOIN salary_slips s ON d.salary_slip_id = s.id
@@ -156,7 +162,9 @@ impl DeliveryRepository {
                 SELECT d.id, d.salary_slip_id, d.employee_id, d.channel, d.status, d.recipient, d.provider,
                        d.message, d.error_code, d.error_message, d.provider_message_id, d.attempt_number,
                        d.created_at, d.started_at, d.completed_at,
-                       COALESCE(e.name, s.detected_name) AS employee_name
+                       COALESCE(e.name, s.detected_name) AS employee_name,
+                       s.month AS salary_month,
+                       s.year AS salary_year
                 FROM delivery_records d
                 LEFT JOIN employees e ON d.employee_id = e.employee_id OR d.employee_id = e.id
                 LEFT JOIN salary_slips s ON d.salary_slip_id = s.id
@@ -205,6 +213,8 @@ pub mod tests {
             started_at: None,
             completed_at: None,
             employee_name: None,
+            month: None,
+            year: None,
         };
 
         repo.create_record(&conn, &record).unwrap();

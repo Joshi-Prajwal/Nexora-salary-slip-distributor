@@ -1,5 +1,6 @@
 use crate::database::connection::DbState;
 use crate::database::repositories::SettingsRepository;
+use crate::security::{redact_secret, sanitize_error_message};
 use crate::messaging::email::{EmailProvider, SmtpEmailProvider};
 use crate::messaging::whatsapp::{OfficialCloudApiWhatsAppProvider, WhatsAppProvider};
 use crate::models::{
@@ -103,7 +104,7 @@ pub fn test_email_connection(
         Err(err) => Ok(ConnectionTestResult {
             success: false,
             code: "EMAIL_CONNECTION_FAILED".to_string(),
-            message: format!("SMTP Connection test failed: {}", err),
+            message: format!("SMTP Connection test failed: {}", sanitize_error_message(&redact_secret(&err.to_string(), password))),
         }),
     }
 }
@@ -165,7 +166,7 @@ pub fn send_test_email(
         Err(err) => Ok(ConnectionTestResult {
             success: false,
             code: "EMAIL_SEND_FAILED".to_string(),
-            message: format!("Failed to send test email: {}", err),
+            message: format!("Failed to send test email: {}", sanitize_error_message(&redact_secret(&err.to_string(), password))),
         }),
     }
 }
@@ -207,7 +208,7 @@ pub fn test_whatsapp_connection(
         Err(err) => Ok(ConnectionTestResult {
             success: false,
             code: "WHATSAPP_CONNECTION_FAILED".to_string(),
-            message: format!("WhatsApp connection test failed: {}", err),
+            message: format!("WhatsApp connection test failed: {}", sanitize_error_message(&redact_secret(&err.to_string(), token))),
         }),
     }
 }

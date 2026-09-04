@@ -97,7 +97,7 @@ export const SalarySlipsPage: React.FC = () => {
                         : '';
                       setToastMessage(`Imported ${summary.pdfCount} salary-slip PDFs from drop${errorNotice}.`);
                     } else if (summary.scanErrors && summary.scanErrors.length > 0) {
-                      setToastMessage(`Unsupported file type: Dropped file(s) are not valid PDFs.`);
+                      setToastMessage('Unsupported file type. Only PDF files are supported.');
                     } else {
                       setToastMessage(`No PDF files found in dropped items.`);
                     }

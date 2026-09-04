@@ -53,6 +53,8 @@ impl DbState {
 
         let conn = Connection::open(db_path).map_err(|e| e.to_string())?;
 
+        let _ = conn.execute_batch("PRAGMA journal_mode = WAL; PRAGMA synchronous = NORMAL;");
+
         Self::migrate(&conn).map_err(|e| e.to_string())?;
 
         // Recover orphan records stuck in PROCESSING state from previous abnormal shutdown
@@ -94,6 +96,9 @@ impl DbState {
     }
 
     pub fn migrate(conn: &Connection) -> Result<()> {
+        // Step 0: Security & Integrity Pragmas
+        conn.execute_batch("PRAGMA foreign_keys = ON; PRAGMA busy_timeout = 5000;")?;
+
         // Step 1: Base table structures
         conn.execute_batch(
             r#"

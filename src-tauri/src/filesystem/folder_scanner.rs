@@ -115,12 +115,25 @@ impl FolderScanner {
                             if ext.to_string_lossy().eq_ignore_ascii_case("pdf") {
                                 match FileMetadataUtil::extract_metadata(entry_path) {
                                     Ok(metadata) => discovered.push(metadata),
-                                    Err(e) => scan_errors.push(ScanError {
-                                        path: entry_path.to_string_lossy().to_string(),
-                                        error_kind: "MetadataError".to_string(),
-                                        message: format!("Failed to read PDF metadata: {}", e),
-                                    }),
+                                    Err(e) => {
+                                        let error_kind = if e.contains("Invalid PDF") || e.contains("signature") || e.contains("empty") {
+                                            "UnsupportedFileType".to_string()
+                                        } else {
+                                            "MetadataError".to_string()
+                                        };
+                                        scan_errors.push(ScanError {
+                                            path: entry_path.to_string_lossy().to_string(),
+                                            error_kind,
+                                            message: format!("Failed to read PDF metadata: {}", e),
+                                        });
+                                    }
                                 }
+                            } else {
+                                scan_errors.push(ScanError {
+                                    path: entry_path.to_string_lossy().to_string(),
+                                    error_kind: "UnsupportedFileType".to_string(),
+                                    message: format!("File is not a PDF: {}", entry_path.to_string_lossy()),
+                                });
                             }
                         }
                     }
@@ -131,11 +144,18 @@ impl FolderScanner {
                     if ext.to_string_lossy().eq_ignore_ascii_case("pdf") {
                         match FileMetadataUtil::extract_metadata(p) {
                             Ok(metadata) => discovered.push(metadata),
-                            Err(e) => scan_errors.push(ScanError {
-                                path: clean_p.clone(),
-                                error_kind: "MetadataError".to_string(),
-                                message: format!("Failed to read PDF metadata: {}", e),
-                            }),
+                            Err(e) => {
+                                let error_kind = if e.contains("Invalid PDF") || e.contains("signature") || e.contains("empty") {
+                                    "UnsupportedFileType".to_string()
+                                } else {
+                                    "MetadataError".to_string()
+                                };
+                                scan_errors.push(ScanError {
+                                    path: clean_p.clone(),
+                                    error_kind,
+                                    message: format!("Failed to read PDF metadata: {}", e),
+                                });
+                            }
                         }
                     } else {
                         scan_errors.push(ScanError {
@@ -144,6 +164,12 @@ impl FolderScanner {
                             message: format!("Selected file is not a PDF: {}", clean_p),
                         });
                     }
+                } else {
+                    scan_errors.push(ScanError {
+                        path: clean_p.clone(),
+                        error_kind: "UnsupportedFileType".to_string(),
+                        message: format!("Selected file has no extension: {}", clean_p),
+                    });
                 }
             }
         }
@@ -316,6 +342,41 @@ mod tests {
 
         assert_eq!(results.len(), 1);
         assert_eq!(diag.pdf_count, 1);
+
+        let _ = std::fs::remove_dir_all(&temp_dir);
+    }
+
+    #[test]
+    fn test_reject_unsupported_and_fake_pdf_files() {
+        let temp_dir = std::env::temp_dir().join(format!("nexora_unsupported_scan_{}", uuid_test()));
+        create_dir_all(&temp_dir).unwrap();
+
+        // 1. Real valid PDF
+        let valid_pdf = temp_dir.join("valid.pdf");
+        File::create(&valid_pdf).unwrap().write_all(b"%PDF-1.4 real document").unwrap();
+
+        // 2. Renamed executable / non-pdf with .pdf extension
+        let fake_pdf = temp_dir.join("disguised_malware.pdf");
+        File::create(&fake_pdf).unwrap().write_all(b"MZ executable header").unwrap();
+
+        // 3. Other unsupported files
+        let docx_file = temp_dir.join("report.docx");
+        File::create(&docx_file).unwrap().write_all(b"PK zip archive").unwrap();
+
+        let exe_file = temp_dir.join("setup.exe");
+        File::create(&exe_file).unwrap().write_all(b"MZ binary").unwrap();
+
+        let scanner = FolderScanner::new();
+        let (results, diag) = scanner.scan_directory(temp_dir.to_str().unwrap()).unwrap();
+
+        // Only the valid PDF should be discovered
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].file_name, "valid.pdf");
+
+        // The fake PDF, docx, and exe should be flagged in scan_errors with UnsupportedFileType
+        assert!(diag.scan_errors.iter().any(|e| e.path.contains("disguised_malware.pdf") && e.error_kind == "UnsupportedFileType"));
+        assert!(diag.scan_errors.iter().any(|e| e.path.contains("report.docx") && e.error_kind == "UnsupportedFileType"));
+        assert!(diag.scan_errors.iter().any(|e| e.path.contains("setup.exe") && e.error_kind == "UnsupportedFileType"));
 
         let _ = std::fs::remove_dir_all(&temp_dir);
     }

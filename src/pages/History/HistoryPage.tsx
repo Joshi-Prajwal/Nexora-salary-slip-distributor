@@ -103,6 +103,15 @@ export const HistoryPage: React.FC = () => {
       ),
     },
     {
+      key: 'period',
+      header: 'Period',
+      render: (item) => (
+        <span className="font-semibold text-xs text-slate-800">
+          {item.month && item.year ? `${item.month} ${item.year}` : item.month || '—'}
+        </span>
+      ),
+    },
+    {
       key: 'recipient',
       header: 'Recipient Target',
       render: (item) => (
@@ -316,7 +325,7 @@ export const HistoryPage: React.FC = () => {
                 <span className="font-semibold text-slate-500 uppercase">Audit Record ID</span>
                 <span className="font-mono font-bold text-slate-900">{selectedRecord.id}</span>
               </div>
-              <div className="grid grid-cols-2 gap-3 pt-1">
+              <div className="grid grid-cols-3 gap-3 pt-1">
                 <div>
                   <span className="text-slate-500 block">Employee ID</span>
                   <span className="font-mono font-bold text-slate-900">
@@ -331,6 +340,14 @@ export const HistoryPage: React.FC = () => {
                     {selectedRecord.employeeName && selectedRecord.employeeName.trim() !== ''
                       ? selectedRecord.employeeName
                       : 'Unidentified'}
+                  </span>
+                </div>
+                <div>
+                  <span className="text-slate-500 block">Salary Period</span>
+                  <span className="font-semibold text-slate-900">
+                    {selectedRecord.month && selectedRecord.year
+                      ? `${selectedRecord.month} ${selectedRecord.year}`
+                      : selectedRecord.month || 'Unspecified'}
                   </span>
                 </div>
               </div>

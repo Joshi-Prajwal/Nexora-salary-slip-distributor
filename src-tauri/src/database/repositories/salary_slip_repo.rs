@@ -233,6 +233,8 @@ impl SalarySlipRepository {
         document_type: Option<&str>,
         document_confidence: Option<f64>,
         target_ocr_status: Option<&str>,
+        month: Option<&str>,
+        year: Option<&str>,
     ) -> Result<bool, String> {
         let now = now_timestamp();
 
@@ -250,8 +252,10 @@ impl SalarySlipRepository {
                     ocr_status = COALESCE(?8, ocr_status),
                     document_type = COALESCE(?9, document_type),
                     document_confidence = COALESCE(?10, document_confidence),
-                    updated_at = ?11
-                WHERE id = ?12
+                    month = COALESCE(?11, month),
+                    year = COALESCE(?12, year),
+                    updated_at = ?13
+                WHERE id = ?14
                 "#,
                 params![
                     extracted_text,
@@ -264,6 +268,8 @@ impl SalarySlipRepository {
                     target_ocr_status,
                     document_type,
                     document_confidence,
+                    month,
+                    year,
                     now,
                     id
                 ],
@@ -290,6 +296,8 @@ impl SalarySlipRepository {
         document_confidence: Option<f64>,
         ocr_page_count: Option<u32>,
         ocr_processing_time_ms: Option<u64>,
+        month: Option<&str>,
+        year: Option<&str>,
     ) -> Result<bool, String> {
         let now = now_timestamp();
 
@@ -312,8 +320,10 @@ impl SalarySlipRepository {
                     ocr_attempt_count = COALESCE(ocr_attempt_count, 0) + 1,
                     ocr_page_count = COALESCE(?13, ocr_page_count),
                     ocr_processing_time_ms = COALESCE(?14, ocr_processing_time_ms),
+                    month = COALESCE(?15, month),
+                    year = COALESCE(?16, year),
                     updated_at = ?9
-                WHERE id = ?15
+                WHERE id = ?17
                 "#,
                 params![
                     extracted_text,
@@ -330,6 +340,8 @@ impl SalarySlipRepository {
                     document_confidence,
                     ocr_page_count,
                     ocr_processing_time_ms,
+                    month,
+                    year,
                     id
                 ],
             )
@@ -366,7 +378,7 @@ impl SalarySlipRepository {
                     match_status = ?,
                     match_confidence = ?,
                     match_reason = ?,
-                    approval_status = ?,
+                    approval_status = CASE WHEN approval_status = 'APPROVED' THEN 'APPROVED' ELSE ? END,
                     matched_at = ?,
                     reviewed_at = ?,
                     reviewed_by = ?,

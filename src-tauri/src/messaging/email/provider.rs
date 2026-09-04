@@ -1,4 +1,5 @@
 use crate::errors::AppError;
+use crate::security::{redact_secret, sanitize_error_message};
 use lettre::message::{header::ContentType, Attachment, MultiPart, SinglePart};
 use lettre::transport::smtp::authentication::Credentials;
 use lettre::{Message, SmtpTransport, Transport};
@@ -233,7 +234,8 @@ impl EmailProvider for SmtpEmailProvider {
                         host_trim, port
                     )))
                 } else {
-                    Err(AppError::ProviderError(format!("SMTP_SEND_FAILED: {}", err_str)))
+                    let clean_err = sanitize_error_message(&redact_secret(&err_str, password));
+                    Err(AppError::ProviderError(format!("SMTP_SEND_FAILED: {}", clean_err)))
                 }
             }
         }
@@ -326,7 +328,8 @@ impl EmailProvider for SmtpEmailProvider {
                         host_trim, port
                     )))
                 } else {
-                    Err(AppError::ProviderError(format!("SMTP_SEND_FAILED: {}", err_str)))
+                    let clean_err = sanitize_error_message(&redact_secret(&err_str, password));
+                    Err(AppError::ProviderError(format!("SMTP_SEND_FAILED: {}", clean_err)))
                 }
             }
         }
@@ -359,9 +362,10 @@ impl EmailProvider for SmtpEmailProvider {
                         "SMTP_AUTH_FAILED: Authentication failed. Verify App Password.".to_string(),
                     ))
                 } else {
+                    let clean_err = sanitize_error_message(&redact_secret(&err_str, password));
                     Err(AppError::ProviderError(format!(
                         "SMTP_CONNECT_FAILED: Failed to connect to SMTP server: {}",
-                        err_str
+                        clean_err
                     )))
                 }
             }

@@ -40,7 +40,10 @@ impl DeliveryService {
     }
 
     fn is_approved(slip: &SalarySlip) -> bool {
-        slip.approval_status == "APPROVED" || slip.match_status == "MANUALLY_CONFIRMED"
+        (slip.approval_status == "APPROVED" || slip.match_status == "MANUALLY_CONFIRMED")
+            && slip.match_status != "CONFLICT"
+            && slip.match_status != "UNMATCHED"
+            && slip.match_status != "NO_MATCH"
     }
 
     pub fn preview_batch(
@@ -235,6 +238,10 @@ impl DeliveryService {
                     .find_by_slip_and_channel(conn, &slip.id, "EMAIL")?;
 
                 if let Some(ref rec) = existing {
+                    let slip_month = slip.month.as_deref().unwrap_or("Current Month");
+                    let slip_year = slip.year.as_deref().unwrap_or("Current Year");
+                    let business_emp_id = if !emp.employee_id.is_empty() { emp.employee_id.clone() } else { emp.id.clone() };
+
                     if rec.status == "SENT" {
                         already_sent += 1;
                         skipped += 1;
@@ -249,8 +256,8 @@ impl DeliveryService {
                             &emp.name,
                             &emp.employee_id,
                             &company_name,
-                            "August",
-                            "2026",
+                            slip_month,
+                            slip_year,
                         );
 
                         let body_rendered = replace_placeholders(
@@ -258,14 +265,14 @@ impl DeliveryService {
                             &emp.name,
                             &emp.employee_id,
                             &company_name,
-                            "August",
-                            "2026",
+                            slip_month,
+                            slip_year,
                         );
 
                         let mut new_rec = DeliveryRecord {
                             id: rec_id.clone(),
                             salary_slip_id: slip.id.clone(),
-                            employee_id: emp.id.clone(),
+                            employee_id: business_emp_id.clone(),
                             channel: "EMAIL".to_string(),
                             status: "PROCESSING".to_string(),
                             recipient: recipient_email.clone(),
@@ -279,6 +286,8 @@ impl DeliveryService {
                             started_at: Some(created.clone()),
                             completed_at: None,
                             employee_name: Some(emp.name.clone()),
+                            month: slip.month.clone(),
+                            year: slip.year.clone(),
                         };
 
                         self.delivery_repo.create_record(conn, &new_rec)?;
@@ -335,6 +344,9 @@ impl DeliveryService {
                         records.push(new_rec);
                     }
                 } else {
+                    let slip_month = slip.month.as_deref().unwrap_or("Current Month");
+                    let slip_year = slip.year.as_deref().unwrap_or("Current Year");
+                    let business_emp_id = if !emp.employee_id.is_empty() { emp.employee_id.clone() } else { emp.id.clone() };
                     let recipient_email = emp.email.clone().unwrap_or_default().trim().to_string();
                     let rec_id = simple_id("del");
                     let created = current_timestamp();
@@ -344,8 +356,8 @@ impl DeliveryService {
                         &emp.name,
                         &emp.employee_id,
                         &company_name,
-                        "August",
-                        "2026",
+                        slip_month,
+                        slip_year,
                     );
 
                     let body_rendered = replace_placeholders(
@@ -353,14 +365,14 @@ impl DeliveryService {
                         &emp.name,
                         &emp.employee_id,
                         &company_name,
-                        "August",
-                        "2026",
+                        slip_month,
+                        slip_year,
                     );
 
                     let mut new_rec = DeliveryRecord {
                         id: rec_id.clone(),
                         salary_slip_id: slip.id.clone(),
-                        employee_id: emp.id.clone(),
+                        employee_id: business_emp_id.clone(),
                         channel: "EMAIL".to_string(),
                         status: "PROCESSING".to_string(),
                         recipient: recipient_email.clone(),
@@ -374,6 +386,8 @@ impl DeliveryService {
                         started_at: Some(created.clone()),
                         completed_at: None,
                         employee_name: Some(emp.name.clone()),
+                        month: slip.month.clone(),
+                        year: slip.year.clone(),
                     };
 
                     self.delivery_repo.create_record(conn, &new_rec)?;
@@ -438,6 +452,10 @@ impl DeliveryService {
                     .find_by_slip_and_channel(conn, &slip.id, "WHATSAPP")?;
 
                 if let Some(ref rec) = existing {
+                    let slip_month = slip.month.as_deref().unwrap_or("Current Month");
+                    let slip_year = slip.year.as_deref().unwrap_or("Current Year");
+                    let business_emp_id = if !emp.employee_id.is_empty() { emp.employee_id.clone() } else { emp.id.clone() };
+
                     if rec.status == "SENT" {
                         already_sent += 1;
                         skipped += 1;
@@ -450,7 +468,7 @@ impl DeliveryService {
                         let mut new_rec = DeliveryRecord {
                             id: rec_id.clone(),
                             salary_slip_id: slip.id.clone(),
-                            employee_id: emp.id.clone(),
+                            employee_id: business_emp_id.clone(),
                             channel: "WHATSAPP".to_string(),
                             status: "PROCESSING".to_string(),
                             recipient: recipient_phone.clone(),
@@ -459,9 +477,9 @@ impl DeliveryService {
                                 "Hello {{employee_name}}, your salary slip is attached.",
                                 &emp.name,
                                 &emp.employee_id,
-                                "Acme Corp",
-                                "August",
-                                "2026",
+                                &company_name,
+                                slip_month,
+                                slip_year,
                             )),
                             error_code: None,
                             error_message: None,
@@ -471,6 +489,8 @@ impl DeliveryService {
                             started_at: Some(created.clone()),
                             completed_at: None,
                             employee_name: Some(emp.name.clone()),
+                            month: slip.month.clone(),
+                            year: slip.year.clone(),
                         };
 
                         self.delivery_repo.create_record(conn, &new_rec)?;
@@ -523,6 +543,9 @@ impl DeliveryService {
                         records.push(new_rec);
                     }
                 } else {
+                    let slip_month = slip.month.as_deref().unwrap_or("Current Month");
+                    let slip_year = slip.year.as_deref().unwrap_or("Current Year");
+                    let business_emp_id = if !emp.employee_id.is_empty() { emp.employee_id.clone() } else { emp.id.clone() };
                     let recipient_phone = emp.phone.clone().unwrap_or_default();
                     let rec_id = simple_id("del");
                     let created = current_timestamp();
@@ -530,7 +553,7 @@ impl DeliveryService {
                     let mut new_rec = DeliveryRecord {
                         id: rec_id.clone(),
                         salary_slip_id: slip.id.clone(),
-                        employee_id: emp.id.clone(),
+                        employee_id: business_emp_id.clone(),
                         channel: "WHATSAPP".to_string(),
                         status: "PROCESSING".to_string(),
                         recipient: recipient_phone.clone(),
@@ -539,9 +562,9 @@ impl DeliveryService {
                             "Hello {{employee_name}}, your salary slip is attached.",
                             &emp.name,
                             &emp.employee_id,
-                            "Acme Corp",
-                            "August",
-                            "2026",
+                            &company_name,
+                            slip_month,
+                            slip_year,
                         )),
                         error_code: None,
                         error_message: None,
@@ -551,6 +574,8 @@ impl DeliveryService {
                         started_at: Some(created.clone()),
                         completed_at: None,
                         employee_name: Some(emp.name.clone()),
+                        month: slip.month.clone(),
+                        year: slip.year.clone(),
                     };
 
                     self.delivery_repo.create_record(conn, &new_rec)?;
@@ -634,6 +659,14 @@ impl DeliveryService {
             None => return Err("Associated salary slip not found".to_string()),
         };
 
+        if !Self::is_approved(&slip) {
+            return Err("Salary slip is not approved or is in an ineligible matching state (CONFLICT, UNMATCHED, or NO_MATCH). Delivery retry blocked.".to_string());
+        }
+
+        if !Path::new(&slip.file_path).exists() {
+            return Err(format!("Salary slip PDF file not found on disk: {}", slip.file_path));
+        }
+
         let now_str = current_timestamp();
 
         let settings_repo = crate::database::repositories::SettingsRepository::new();
@@ -659,6 +692,8 @@ impl DeliveryService {
             started_at: Some(now_str.clone()),
             completed_at: None,
             employee_name: rec.employee_name.clone(),
+            month: rec.month.clone(),
+            year: rec.year.clone(),
         };
 
         self.delivery_repo.create_record(conn, &new_rec)?;
@@ -845,6 +880,8 @@ mod tests {
             started_at: Some("1000".to_string()),
             completed_at: Some("1001".to_string()),
             employee_name: Some("Test Employee".to_string()),
+            month: None,
+            year: None,
         };
 
         repo.create_record(&conn, &initial_record).unwrap();

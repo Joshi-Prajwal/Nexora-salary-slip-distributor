@@ -25,7 +25,8 @@ import {
   XCircle,
   AlertTriangle,
   FilterX,
-  Sparkles
+  Sparkles,
+  Calendar
 } from 'lucide-react';
 
 export const MatchingPage: React.FC = () => {
@@ -38,18 +39,27 @@ export const MatchingPage: React.FC = () => {
     confirmMatch,
     rejectMatch,
     resetMatch,
-    confirmAllSafeMatches,
     bulkUpdateApprovalStatus,
   } = useMatchingStore();
 
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
+  const [selectedMonthFilter, setSelectedMonthFilter] = useState('ALL');
   const [quickFilter, setQuickFilter] = useState<string>('ALL');
   const [advancedFilters, setAdvancedFilters] = useState<FilterState>(initialFilterState);
   const [selectedReviewSlip, setSelectedReviewSlip] = useState<SalarySlip | null>(null);
   const [selectedKeys, setSelectedKeys] = useState<Set<string>>(new Set());
   const [isBulkConfirmModalOpen, setIsBulkConfirmModalOpen] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+
+  const availableMonths = useMemo(() => {
+    const monthsSet = new Set<string>();
+    slips.forEach((s) => {
+      if (s.month && s.year) monthsSet.add(`${s.month} ${s.year}`);
+      else if (s.month) monthsSet.add(s.month);
+    });
+    return Array.from(monthsSet).sort();
+  }, [slips]);
 
   // Debounce search input (200ms) for high performance on 156+ records
   useEffect(() => {
@@ -89,6 +99,12 @@ export const MatchingPage: React.FC = () => {
   // Unified Filter Calculation
   const filteredSlips = useMemo(() => {
     return slips.filter((slip) => {
+      // 0. Month / Period Filter
+      if (selectedMonthFilter !== 'ALL') {
+        const slipPeriod = slip.month && slip.year ? `${slip.month} ${slip.year}` : slip.month || 'Unspecified';
+        if (slipPeriod !== selectedMonthFilter) return false;
+      }
+
       // 1. Quick Filters
       if (quickFilter === 'NEEDS_REVIEW') {
         const isNeedsReview =
@@ -108,25 +124,25 @@ export const MatchingPage: React.FC = () => {
       } else if (quickFilter === 'PENDING') {
         const isPending = slip.approvalStatus === 'PENDING' || (!slip.approvalStatus && slip.matchStatus !== 'MANUALLY_CONFIRMED');
         if (!isPending) return false;
-      } else if (quickFilter === 'REJECTED') {
-        const isRejected = slip.approvalStatus === 'REJECTED' || slip.matchStatus === 'MANUALLY_REJECTED';
-        if (!isRejected) return false;
-      } else if (quickFilter !== 'ALL') {
-        if (slip.matchStatus !== quickFilter && slip.approvalStatus !== quickFilter) return false;
+      } else if (quickFilter === 'EXACT_MATCH') {
+        if (slip.matchStatus !== 'EXACT_MATCH') return false;
+      } else if (quickFilter === 'STRONG_MATCH') {
+        if (slip.matchStatus !== 'STRONG_MATCH') return false;
       }
 
       // 2. Advanced Filters
-      if (advancedFilters.matchStatus !== 'ALL') {
-        if (advancedFilters.matchStatus === 'UNMATCHED') {
-          if (slip.matchStatus !== 'UNMATCHED' && slip.matchStatus !== 'NOT_IDENTIFIED') return false;
-        } else if (slip.matchStatus !== advancedFilters.matchStatus) {
-          return false;
-        }
+      if (advancedFilters.matchStatus !== 'ALL' && slip.matchStatus !== advancedFilters.matchStatus) {
+        return false;
       }
 
       if (advancedFilters.approvalStatus !== 'ALL') {
-        const appStat = slip.approvalStatus || 'PENDING';
-        if (appStat !== advancedFilters.approvalStatus) return false;
+        if (advancedFilters.approvalStatus === 'APPROVED') {
+          if (slip.approvalStatus !== 'APPROVED' && slip.matchStatus !== 'MANUALLY_CONFIRMED') return false;
+        } else if (advancedFilters.approvalStatus === 'PENDING') {
+          if (slip.approvalStatus !== 'PENDING' && slip.approvalStatus) return false;
+        } else if (advancedFilters.approvalStatus === 'REJECTED') {
+          if (slip.approvalStatus !== 'REJECTED' && slip.matchStatus !== 'MANUALLY_REJECTED') return false;
+        }
       }
 
       if (advancedFilters.ocrStatus !== 'ALL') {
@@ -152,14 +168,14 @@ export const MatchingPage: React.FC = () => {
       if (!debouncedSearch.trim()) return true;
       return matchesSlipQuery(slip, debouncedSearch, employees);
     });
-  }, [slips, quickFilter, advancedFilters, debouncedSearch, employees]);
+  }, [slips, selectedMonthFilter, quickFilter, advancedFilters, debouncedSearch, employees]);
 
   // Authoritative Mathematical Summary Calculations
   const totalSlips = slips.length;
   const exactMatches = useMemo(() => slips.filter((s) => s.matchStatus === 'EXACT_MATCH').length, [slips]);
   const strongMatches = useMemo(() => slips.filter((s) => s.matchStatus === 'STRONG_MATCH').length, [slips]);
-  const possibleMatches = useMemo(() => slips.filter((s) => s.matchStatus === 'POSSIBLE_MATCH').length, [slips]);
   const conflicts = useMemo(() => slips.filter((s) => s.matchStatus === 'CONFLICT').length, [slips]);
+  const possibleMatches = useMemo(() => slips.filter((s) => s.matchStatus === 'POSSIBLE_MATCH').length, [slips]);
   const noMatch = useMemo(() => slips.filter((s) => s.matchStatus === 'NO_MATCH').length, [slips]);
   const unmatched = useMemo(
     () => slips.filter((s) => s.matchStatus === 'UNMATCHED' || s.matchStatus === 'NOT_IDENTIFIED' || s.matchStatus === 'DUPLICATE_CONTENT').length,
@@ -175,9 +191,9 @@ export const MatchingPage: React.FC = () => {
     [slips]
   );
 
-  // Safe Bulk Confirm Eligibility Calculation
+  // Safe Bulk Confirm Eligibility Calculation (Scoped strictly to visible filtered slips)
   const safeConfirmableSlips = useMemo(() => {
-    return slips.filter((s) => {
+    return filteredSlips.filter((s) => {
       const isExact = s.matchStatus === 'EXACT_MATCH';
       const hasEmp = !!s.matchedEmployeeId;
       const notRejected = s.approvalStatus !== 'REJECTED' && s.matchStatus !== 'MANUALLY_REJECTED';
@@ -187,7 +203,7 @@ export const MatchingPage: React.FC = () => {
       const notAlreadyApproved = s.approvalStatus !== 'APPROVED' && s.matchStatus !== 'MANUALLY_CONFIRMED';
       return isExact && hasEmp && notRejected && notConflict && notUnmatched && ocrOk && notAlreadyApproved;
     });
-  }, [slips]);
+  }, [filteredSlips]);
 
   const activeFilterCount = useMemo(() => {
     let count = 0;
@@ -245,17 +261,20 @@ export const MatchingPage: React.FC = () => {
 
   const handleConfirmAllSafe = async () => {
     setIsBulkConfirmModalOpen(false);
-    const result = await confirmAllSafeMatches();
-    if (result) {
-      setToastMessage(
-        `${result.confirmedCount} salary slips confirmed and approved. ${result.skippedCount} salary slips still require review.`
-      );
-    }
+    if (safeConfirmableSlips.length === 0) return;
+    const idsToApprove = safeConfirmableSlips.map((s) => s.id);
+    await bulkUpdateApprovalStatus(idsToApprove, 'APPROVED');
+    const periodLabel = selectedMonthFilter !== 'ALL' ? selectedMonthFilter : 'all visible periods';
+    const skippedCount = filteredSlips.length - safeConfirmableSlips.length;
+    setToastMessage(
+      `Approved: ${idsToApprove.length} exact matches (${periodLabel}). Skipped: ${skippedCount} record(s) (conflicts/unmatched/already approved).`
+    );
   };
 
   const clearAllFilters = () => {
     setSearch('');
     setDebouncedSearch('');
+    setSelectedMonthFilter('ALL');
     setQuickFilter('ALL');
     setAdvancedFilters(initialFilterState);
   };
@@ -466,6 +485,24 @@ export const MatchingPage: React.FC = () => {
               />
 
               <div className="flex items-center gap-2 shrink-0">
+                {availableMonths.length > 0 && (
+                  <div className="flex items-center gap-2 shrink-0">
+                    <Calendar className="w-4 h-4 text-slate-400" />
+                    <select
+                      value={selectedMonthFilter}
+                      onChange={(e) => setSelectedMonthFilter(e.target.value)}
+                      className="px-3 py-1.5 bg-white border border-slate-300 rounded-lg text-sm text-slate-700 font-medium focus:outline-none focus:ring-2 focus:ring-sky-500"
+                    >
+                      <option value="ALL">All Periods ({slips.length})</option>
+                      {availableMonths.map((m) => (
+                        <option key={m} value={m}>
+                          {m}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+
                 <AdvancedFilterPopover
                   filters={advancedFilters}
                   onApplyFilters={setAdvancedFilters}
@@ -473,7 +510,7 @@ export const MatchingPage: React.FC = () => {
                   activeFilterCount={activeFilterCount}
                 />
 
-                {(search || quickFilter !== 'ALL' || activeFilterCount > 0) && (
+                {(search || quickFilter !== 'ALL' || activeFilterCount > 0 || selectedMonthFilter !== 'ALL') && (
                   <Button
                     variant="ghost"
                     size="sm"

@@ -8,6 +8,14 @@ pub struct ParsedPdfData {
     pub name: Option<String>,
     pub phone: Option<String>,
     pub email: Option<String>,
+    pub department: Option<String>,
+    pub designation: Option<String>,
+    pub employer: Option<String>,
+    pub basic_salary: Option<String>,
+    pub gross_salary: Option<String>,
+    pub net_salary: Option<String>,
+    pub month: Option<String>,
+    pub year: Option<String>,
 }
 
 pub trait DocumentParser {
@@ -38,6 +46,14 @@ impl DocumentParser for DefaultDocumentParser {
         let mut name = None;
         let mut email = None;
         let mut phone = None;
+        let mut department = None;
+        let mut designation = None;
+        let mut employer = None;
+        let mut basic_salary = None;
+        let mut gross_salary = None;
+        let mut net_salary = None;
+        let mut month = None;
+        let mut year = None;
 
         // 1. Extract Email
         let email_re = Regex::new(r"(?i)\b([A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,})\b").unwrap();
@@ -87,11 +103,88 @@ impl DocumentParser for DefaultDocumentParser {
             }
         }
 
+        // 5. Extract Department
+        let dept_re = Regex::new(r"(?i)(?:department|dept)\s*[:\-\s]\s*([A-Za-z0-9\s&_\-]+)").unwrap();
+        if let Some(caps) = dept_re.captures(&normalized) {
+            let d = caps[1].lines().next().unwrap_or("").trim();
+            if !d.is_empty() && d.len() <= 40 {
+                department = Some(d.to_string());
+            }
+        }
+
+        // 6. Extract Designation
+        let desig_re = Regex::new(r"(?i)(?:designation|role|job\s*title|position)\s*[:\-\s]\s*([A-Za-z0-9\s&_\-]+)").unwrap();
+        if let Some(caps) = desig_re.captures(&normalized) {
+            let des = caps[1].lines().next().unwrap_or("").trim();
+            if !des.is_empty() && des.len() <= 50 {
+                designation = Some(des.to_string());
+            }
+        }
+
+        // 7. Extract Employer / Organization
+        let emp_org_re = Regex::new(r"(?i)(?:company|employer|organization|firm)\s*[:\-\s]\s*([A-Za-z0-9\s&_\-\.]+)").unwrap();
+        if let Some(caps) = emp_org_re.captures(&normalized) {
+            let o = caps[1].lines().next().unwrap_or("").trim();
+            if !o.is_empty() && o.len() <= 60 {
+                employer = Some(o.to_string());
+            }
+        }
+
+        // 8. Extract Salary Figures (Basic, Gross, Net)
+        let basic_re = Regex::new(r"(?i)(?:basic(?:\s*salary|\s*pay)?)\s*[:\-\s]\s*([₹$€£]?\s*[0-9,]+(?:\.[0-9]{2})?)").unwrap();
+        if let Some(caps) = basic_re.captures(&normalized) {
+            basic_salary = Some(caps[1].trim().to_string());
+        }
+
+        let gross_re = Regex::new(r"(?i)(?:gross(?:\s*salary|\s*pay|\s*earnings)?)\s*[:\-\s]\s*([₹$€£]?\s*[0-9,]+(?:\.[0-9]{2})?)").unwrap();
+        if let Some(caps) = gross_re.captures(&normalized) {
+            gross_salary = Some(caps[1].trim().to_string());
+        }
+
+        let net_re = Regex::new(r"(?i)(?:net(?:\s*salary|\s*pay|\s*amount|\s*take\s*home)?)\s*[:\-\s]\s*([₹$€£]?\s*[0-9,]+(?:\.[0-9]{2})?)").unwrap();
+        if let Some(caps) = net_re.captures(&normalized) {
+            net_salary = Some(caps[1].trim().to_string());
+        }
+
+        // 9. Extract Month & Year
+        let month_re = Regex::new(r"(?i)\b(January|February|March|April|May|June|July|August|September|October|November|December|Jan|Feb|Mar|Apr|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\b").unwrap();
+        if let Some(caps) = month_re.captures(&normalized) {
+            let m = caps[1].to_lowercase();
+            month = Some(match m.as_str() {
+                "january" | "jan" => "January".to_string(),
+                "february" | "feb" => "February".to_string(),
+                "march" | "mar" => "March".to_string(),
+                "april" | "apr" => "April".to_string(),
+                "may" => "May".to_string(),
+                "june" | "jun" => "June".to_string(),
+                "july" | "jul" => "July".to_string(),
+                "august" | "aug" => "August".to_string(),
+                "september" | "sep" => "September".to_string(),
+                "october" | "oct" => "October".to_string(),
+                "november" | "nov" => "November".to_string(),
+                "december" | "dec" => "December".to_string(),
+                _ => caps[1].to_string(),
+            });
+        }
+
+        let year_re = Regex::new(r"\b(20[2-3][0-9])\b").unwrap();
+        if let Some(caps) = year_re.captures(&normalized) {
+            year = Some(caps[1].to_string());
+        }
+
         Ok(ParsedPdfData {
             employee_id,
             name,
             phone,
             email,
+            department,
+            designation,
+            employer,
+            basic_salary,
+            gross_salary,
+            net_salary,
+            month,
+            year,
         })
     }
 }

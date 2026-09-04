@@ -19,7 +19,9 @@ impl SalarySlipRepository {
                        match_confidence, match_status, duplicate_of_id, ocr_confidence,
                        ocr_processed_at, ocr_error, matched_employee_id, match_reason,
                        matched_at, reviewed_at, reviewed_by, review_note, month, year,
-                       approval_status, ocr_status, created_at, updated_at
+                       approval_status, ocr_status, document_type, document_confidence,
+                       ocr_attempt_count, ocr_page_count, ocr_processing_time_ms,
+                       created_at, updated_at
                 FROM salary_slips
                 ORDER BY created_at DESC
                 "#,
@@ -55,8 +57,13 @@ impl SalarySlipRepository {
                     year: row.get(23)?,
                     approval_status: row.get(24).unwrap_or_else(|_| "PENDING".to_string()),
                     ocr_status: row.get(25).unwrap_or_else(|_| "NOT_REQUIRED".to_string()),
-                    created_at: row.get(26)?,
-                    updated_at: row.get(27)?,
+                    document_type: row.get(26).ok(),
+                    document_confidence: row.get(27).ok(),
+                    ocr_attempt_count: row.get(28).ok(),
+                    ocr_page_count: row.get(29).ok(),
+                    ocr_processing_time_ms: row.get(30).ok(),
+                    created_at: row.get(31)?,
+                    updated_at: row.get(32)?,
                 })
             })
             .map_err(|e| e.to_string())?;
@@ -80,7 +87,9 @@ impl SalarySlipRepository {
                        match_confidence, match_status, duplicate_of_id, ocr_confidence,
                        ocr_processed_at, ocr_error, matched_employee_id, match_reason,
                        matched_at, reviewed_at, reviewed_by, review_note, month, year,
-                       approval_status, ocr_status, created_at, updated_at
+                       approval_status, ocr_status, document_type, document_confidence,
+                       ocr_attempt_count, ocr_page_count, ocr_processing_time_ms,
+                       created_at, updated_at
                 FROM salary_slips
                 WHERE id = ?
                 "#,
@@ -116,8 +125,13 @@ impl SalarySlipRepository {
                     year: row.get(23)?,
                     approval_status: row.get(24).unwrap_or_else(|_| "PENDING".to_string()),
                     ocr_status: row.get(25).unwrap_or_else(|_| "NOT_REQUIRED".to_string()),
-                    created_at: row.get(26)?,
-                    updated_at: row.get(27)?,
+                    document_type: row.get(26).ok(),
+                    document_confidence: row.get(27).ok(),
+                    ocr_attempt_count: row.get(28).ok(),
+                    ocr_page_count: row.get(29).ok(),
+                    ocr_processing_time_ms: row.get(30).ok(),
+                    created_at: row.get(31)?,
+                    updated_at: row.get(32)?,
                 })
             })
             .ok();
@@ -215,28 +229,29 @@ impl SalarySlipRepository {
         detected_phone: Option<&str>,
         detected_email: Option<&str>,
         extraction_method: &str,
-        _unused_status: &str,
+        match_status: Option<&str>,
+        document_type: Option<&str>,
+        document_confidence: Option<f64>,
+        target_ocr_status: Option<&str>,
     ) -> Result<bool, String> {
         let now = now_timestamp();
-        let ocr_status = if extraction_method == "TEXT_EMBEDDED" {
-            "NOT_REQUIRED"
-        } else {
-            "PENDING"
-        };
 
         let rows = conn
             .execute(
                 r#"
                 UPDATE salary_slips
-                SET extracted_text = ?,
-                    detected_employee_id = ?,
-                    detected_name = ?,
-                    detected_phone = ?,
-                    detected_email = ?,
-                    extraction_method = ?,
-                    ocr_status = ?,
-                    updated_at = ?
-                WHERE id = ?
+                SET extracted_text = COALESCE(?1, extracted_text),
+                    detected_employee_id = COALESCE(?2, detected_employee_id),
+                    detected_name = COALESCE(?3, detected_name),
+                    detected_phone = COALESCE(?4, detected_phone),
+                    detected_email = COALESCE(?5, detected_email),
+                    extraction_method = ?6,
+                    match_status = COALESCE(?7, match_status),
+                    ocr_status = COALESCE(?8, ocr_status),
+                    document_type = COALESCE(?9, document_type),
+                    document_confidence = COALESCE(?10, document_confidence),
+                    updated_at = ?11
+                WHERE id = ?12
                 "#,
                 params![
                     extracted_text,
@@ -245,7 +260,10 @@ impl SalarySlipRepository {
                     detected_phone,
                     detected_email,
                     extraction_method,
-                    ocr_status,
+                    match_status,
+                    target_ocr_status,
+                    document_type,
+                    document_confidence,
                     now,
                     id
                 ],
@@ -268,6 +286,10 @@ impl SalarySlipRepository {
         ocr_status: &str,
         ocr_confidence: Option<f64>,
         ocr_error: Option<&str>,
+        document_type: Option<&str>,
+        document_confidence: Option<f64>,
+        ocr_page_count: Option<u32>,
+        ocr_processing_time_ms: Option<u64>,
     ) -> Result<bool, String> {
         let now = now_timestamp();
 
@@ -275,18 +297,23 @@ impl SalarySlipRepository {
             .execute(
                 r#"
                 UPDATE salary_slips
-                SET extracted_text = ?,
-                    detected_employee_id = ?,
-                    detected_name = ?,
-                    detected_phone = ?,
-                    detected_email = ?,
-                    extraction_method = ?,
-                    ocr_status = ?,
-                    ocr_confidence = ?,
-                    ocr_processed_at = ?,
-                    ocr_error = ?,
-                    updated_at = ?
-                WHERE id = ?
+                SET extracted_text = COALESCE(?1, extracted_text),
+                    detected_employee_id = COALESCE(?2, detected_employee_id),
+                    detected_name = COALESCE(?3, detected_name),
+                    detected_phone = COALESCE(?4, detected_phone),
+                    detected_email = COALESCE(?5, detected_email),
+                    extraction_method = ?6,
+                    ocr_status = ?7,
+                    ocr_confidence = COALESCE(?8, ocr_confidence),
+                    ocr_processed_at = ?9,
+                    ocr_error = ?10,
+                    document_type = COALESCE(?11, document_type),
+                    document_confidence = COALESCE(?12, document_confidence),
+                    ocr_attempt_count = COALESCE(ocr_attempt_count, 0) + 1,
+                    ocr_page_count = COALESCE(?13, ocr_page_count),
+                    ocr_processing_time_ms = COALESCE(?14, ocr_processing_time_ms),
+                    updated_at = ?9
+                WHERE id = ?15
                 "#,
                 params![
                     extracted_text,
@@ -299,7 +326,10 @@ impl SalarySlipRepository {
                     ocr_confidence,
                     now,
                     ocr_error,
-                    now,
+                    document_type,
+                    document_confidence,
+                    ocr_page_count,
+                    ocr_processing_time_ms,
                     id
                 ],
             )

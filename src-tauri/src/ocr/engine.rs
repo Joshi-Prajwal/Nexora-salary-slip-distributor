@@ -22,22 +22,39 @@ impl FallbackOcrEngine {
     }
 
     fn find_tesseract_path(&self) -> Option<String> {
-        // 1. Check if 'tesseract' is available in system PATH
-        if Command::new("tesseract").arg("--version").output().is_ok() {
-            return Some("tesseract".to_string());
-        }
-
-        // 2. Check common Windows installation paths
-        let common_paths = [
-            r"C:\Program Files\Tesseract-OCR\tesseract.exe",
-            r"C:\Program Files (x86)\Tesseract-OCR\tesseract.exe",
-            r".\tesseract.exe",
+        // 1. Check common Windows installation paths
+        let mut candidate_paths = vec![
+            r"C:\Program Files\Tesseract-OCR\tesseract.exe".to_string(),
+            r"C:\Program Files (x86)\Tesseract-OCR\tesseract.exe".to_string(),
+            r".\tesseract.exe".to_string(),
         ];
 
-        for path in &common_paths {
-            if Path::new(path).exists() {
-                return Some(path.to_string());
+        // 2. Check local user AppData
+        if let Ok(local_app_data) = std::env::var("LOCALAPPDATA") {
+            candidate_paths.push(format!(r"{}\Programs\Tesseract-OCR\tesseract.exe", local_app_data));
+            candidate_paths.push(format!(r"{}\Tesseract-OCR\tesseract.exe", local_app_data));
+        }
+
+        // 3. Check executable path relative to current running process
+        if let Ok(curr_exe) = std::env::current_exe() {
+            if let Some(parent) = curr_exe.parent() {
+                candidate_paths.push(parent.join("tesseract.exe").to_string_lossy().to_string());
+                candidate_paths.push(parent.join("resources").join("tesseract.exe").to_string_lossy().to_string());
             }
+        }
+
+        for path in &candidate_paths {
+            if Path::new(path).exists() {
+                // Verify binary can execute
+                if Command::new(path).arg("--version").output().is_ok() {
+                    return Some(path.clone());
+                }
+            }
+        }
+
+        // 4. Check if 'tesseract' is available globally in Windows PATH
+        if Command::new("tesseract").arg("--version").output().is_ok() {
+            return Some("tesseract".to_string());
         }
 
         None
@@ -56,7 +73,7 @@ impl OcrEngine for FallbackOcrEngine {
             Some(bin) => bin,
             None => {
                 return Err(OcrError::EngineUnavailable(
-                    "Local OCR engine (Tesseract) is not installed on this system. Please install Tesseract-OCR or place tesseract.exe in application path.".to_string()
+                    "Tesseract OCR is not installed or not in PATH. Please install Tesseract-OCR for Windows (e.g. from https://github.com/UB-Mannheim/tesseract/wiki) to C:\\Program Files\\Tesseract-OCR\\tesseract.exe.".to_string()
                 ));
             }
         };
@@ -66,9 +83,15 @@ impl OcrEngine for FallbackOcrEngine {
         let mut full_text = String::new();
         let total_confidence = 90.0; // Default baseline OCR confidence
 
-        for _img_path in &page_images {
+        for img_path in &page_images {
+            let input_target = if img_path.exists() {
+                img_path.to_string_lossy().to_string()
+            } else {
+                pdf_path.to_string()
+            };
+
             let output_res = Command::new(&tesseract_bin)
-                .arg(pdf_path)
+                .arg(&input_target)
                 .arg("stdout")
                 .arg("--oem")
                 .arg("1")
@@ -84,8 +107,8 @@ impl OcrEngine for FallbackOcrEngine {
                     let err_msg = String::from_utf8_lossy(&output.stderr);
                     self.renderer.cleanup_temp_files(&page_images);
                     return Err(OcrError::RecognitionFailed(format!(
-                        "Tesseract OCR process returned error exit code: {}",
-                        err_msg
+                        "Tesseract OCR failed: {}",
+                        err_msg.trim()
                     )));
                 }
                 Err(e) => {

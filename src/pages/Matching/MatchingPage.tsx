@@ -218,8 +218,20 @@ export const MatchingPage: React.FC = () => {
   const handleBulkApprove = async () => {
     if (selectedKeys.size === 0) return;
     const ids = Array.from(selectedKeys);
+    
+    // Count records that are ineligible (CONFLICT, NO_MATCH, UNMATCHED, or missing employee)
+    const selectedSlips = slips.filter((s) => selectedKeys.has(s.id));
+    const ineligibleCount = selectedSlips.filter(
+      (s) => s.matchStatus === 'CONFLICT' || s.matchStatus === 'NO_MATCH' || s.matchStatus === 'UNMATCHED' || !s.matchedEmployeeId
+    ).length;
+    const eligibleCount = ids.length - ineligibleCount;
+
     await bulkUpdateApprovalStatus(ids, 'APPROVED');
-    setToastMessage(`Bulk approved ${ids.length} selected salary slips.`);
+    if (ineligibleCount > 0) {
+      setToastMessage(`Bulk approved ${eligibleCount} eligible slips. (${ineligibleCount} conflict/unmatched record(s) skipped for manual review)`);
+    } else {
+      setToastMessage(`Bulk approved ${eligibleCount} selected salary slips.`);
+    }
     setSelectedKeys(new Set());
   };
 

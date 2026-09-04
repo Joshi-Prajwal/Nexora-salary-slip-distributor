@@ -217,7 +217,54 @@ impl EmployeeMatcher for StandardMatcher {
 
         let best_candidate = candidates[0].clone();
 
-        // Conflict handling: explicit conflict flag or close top candidate scores
+        // 1. Check for cross-candidate conflict (e.g. Employee ID matches Emp A, but Email or Phone matches Emp B)
+        let mut cross_candidate_conflict = None;
+        if candidates.len() > 1 {
+            let top_has_id = candidates[0].matched_fields.contains(&"Employee ID".to_string());
+            for other in &candidates[1..] {
+                if other.employee_db_id != candidates[0].employee_db_id {
+                    let other_has_email = other.matched_fields.contains(&"Email".to_string());
+                    let other_has_phone = other.matched_fields.contains(&"Phone".to_string());
+                    let other_has_id = other.matched_fields.contains(&"Employee ID".to_string());
+
+                    if top_has_id && (other_has_email || other_has_phone) {
+                        cross_candidate_conflict = Some(format!(
+                            "Conflict detected: Employee ID matches {} ({}), but {} matches {} ({}).",
+                            candidates[0].name,
+                            candidates[0].employee_id,
+                            if other_has_email { "Email" } else { "Phone" },
+                            other.name,
+                            other.employee_id
+                        ));
+                        break;
+                    } else if other_has_id && (candidates[0].matched_fields.contains(&"Email".to_string()) || candidates[0].matched_fields.contains(&"Phone".to_string())) {
+                        cross_candidate_conflict = Some(format!(
+                            "Conflict detected: Employee ID matches {} ({}), but {} matches {} ({}).",
+                            other.name,
+                            other.employee_id,
+                            if candidates[0].matched_fields.contains(&"Email".to_string()) { "Email" } else { "Phone" },
+                            candidates[0].name,
+                            candidates[0].employee_id
+                        ));
+                        break;
+                    }
+                }
+            }
+        }
+
+        // 2. Conflict handling: intra-candidate conflict flag, cross-candidate conflict, or close ambiguous scores
+        if let Some(conflict_msg) = cross_candidate_conflict {
+            return MatchResult {
+                salary_slip_id: slip.id.clone(),
+                status: MatchStatus::Conflict.as_str().to_string(),
+                confidence: 0.50,
+                matched_employee_id: Some(best_candidate.employee_db_id.clone()),
+                candidate: Some(best_candidate.clone()),
+                all_candidates: candidates.clone(),
+                reason: conflict_msg,
+            };
+        }
+
         if best_candidate.explanation.contains("Conflict detected")
             || (candidates.len() > 1 && (candidates[0].score - candidates[1].score).abs() < 5.0 && candidates[0].score < 100.0)
         {
@@ -302,6 +349,11 @@ mod tests {
             year: None,
             approval_status: "PENDING".to_string(),
             ocr_status: "NOT_REQUIRED".to_string(),
+            document_type: Some("SALARY_SLIP".to_string()),
+            document_confidence: Some(95.0),
+            ocr_attempt_count: Some(0),
+            ocr_page_count: Some(1),
+            ocr_processing_time_ms: Some(10),
             created_at: "1000".to_string(),
             updated_at: "1000".to_string(),
         }
@@ -340,6 +392,21 @@ mod tests {
 
         let res = matcher.match_slip(&slip, &[emp]);
         assert_eq!(res.status, "CONFLICT");
+    }
+
+    #[test]
+    fn test_cross_candidate_conflict_detection() {
+        // Emp A has ID 101, Emp B has email bob@example.com
+        let emp_a = create_test_employee("emp-a", "101", "Alice", "alice@example.com", "111");
+        let emp_b = create_test_employee("emp-b", "102", "Bob", "bob@example.com", "222");
+
+        // Slip has ID 101 (pointing to Alice) but Email bob@example.com (pointing to Bob)
+        let slip = create_test_slip("slip-conflict", "101.pdf", Some("101"), None, Some("bob@example.com"), None);
+        let matcher = StandardMatcher::new();
+
+        let res = matcher.match_slip(&slip, &[emp_a, emp_b]);
+        assert_eq!(res.status, "CONFLICT");
+        assert!(res.reason.contains("Conflict detected"));
     }
 
     #[test]

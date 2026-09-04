@@ -91,7 +91,16 @@ export const SalarySlipsPage: React.FC = () => {
                 try {
                   const summary = await ingestPaths(paths);
                   if (summary) {
-                    setToastMessage(`Imported ${summary.pdfCount} salary-slip PDFs from drop.`);
+                    if (summary.pdfCount > 0) {
+                      const errorNotice = summary.scanErrors && summary.scanErrors.length > 0 
+                        ? ` (${summary.scanErrors.length} unsupported file(s) ignored)` 
+                        : '';
+                      setToastMessage(`Imported ${summary.pdfCount} salary-slip PDFs from drop${errorNotice}.`);
+                    } else if (summary.scanErrors && summary.scanErrors.length > 0) {
+                      setToastMessage(`Unsupported file type: Dropped file(s) are not valid PDFs.`);
+                    } else {
+                      setToastMessage(`No PDF files found in dropped items.`);
+                    }
                   }
                 } catch (err: any) {
                   setToastMessage(`Failed to import dropped items: ${err.message || err}`);

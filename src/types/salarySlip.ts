@@ -35,6 +35,8 @@ export type OcrStatus =
   | 'TIMEOUT'
   | 'FAILED';
 
+export type DocumentType = 'SALARY_SLIP' | 'POSSIBLE_SALARY_SLIP' | 'NOT_SALARY_SLIP' | 'UNKNOWN';
+
 export interface SalarySlip {
   id: string;
   filePath: string;
@@ -62,6 +64,11 @@ export interface SalarySlip {
   year?: string;
   approvalStatus: ApprovalStatus;
   ocrStatus: OcrStatus;
+  documentType?: DocumentType;
+  documentConfidence?: number;
+  ocrAttemptCount?: number;
+  ocrPageCount?: number;
+  ocrProcessingTimeMs?: number;
   createdAt: string;
   updatedAt: string;
 }

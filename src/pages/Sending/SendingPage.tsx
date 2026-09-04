@@ -142,10 +142,15 @@ export const SendingPage: React.FC = () => {
               <div className="p-2.5 rounded-lg bg-emerald-100 text-emerald-700">
                 <MessageSquare className="w-5 h-5" />
               </div>
-              <span className="text-xs font-semibold text-slate-500">WhatsApp</span>
+              <div className="flex items-center gap-1.5">
+                <span className="px-1.5 py-0.5 text-[10px] font-bold bg-amber-100 text-amber-800 rounded border border-amber-300">
+                  NOT CONFIGURED
+                </span>
+                <span className="text-xs font-semibold text-slate-500">WhatsApp</span>
+              </div>
             </div>
             <h4 className="text-sm font-semibold text-slate-900">WhatsApp Delivery</h4>
-            <p className="text-xs text-slate-500 mt-1">Send salary slips through your connected WhatsApp Business Cloud API.</p>
+            <p className="text-xs text-slate-500 mt-1">Official Meta WhatsApp Cloud API integration (Cloud API credentials not configured yet).</p>
           </div>
 
           <div

@@ -1,5 +1,5 @@
 use rusqlite::Connection;
-use crate::models::{DeliveryBatchSummary, DeliveryChannel, DeliveryPreview, DeliveryRecord};
+use crate::models::{DeliveryBatchSummary, DeliveryChannel, DeliveryPreview, DeliveryRecord, SalarySlip};
 use crate::database::repositories::{DeliveryRepository, EmployeeRepository, SalarySlipRepository};
 use crate::messaging::email::{replace_placeholders, EmailProvider, SmtpEmailProvider};
 use crate::messaging::whatsapp::{OfficialCloudApiWhatsAppProvider, WhatsAppProvider};
@@ -39,11 +39,8 @@ impl DeliveryService {
         }
     }
 
-    fn is_approved(match_status: &str) -> bool {
-        match match_status.to_uppercase().as_str() {
-            "EXACT_MATCH" | "STRONG_MATCH" | "MANUALLY_CONFIRMED" | "CONFIRMED" | "READY" => true,
-            _ => false,
-        }
+    fn is_approved(slip: &SalarySlip) -> bool {
+        slip.approval_status == "APPROVED" || slip.match_status == "MANUALLY_CONFIRMED"
     }
 
     pub fn preview_batch(
@@ -75,7 +72,7 @@ impl DeliveryService {
                 }
             };
 
-            if !Self::is_approved(&slip.match_status) {
+            if !Self::is_approved(&slip) {
                 ineligible_count += 1;
                 continue;
             }
@@ -210,7 +207,7 @@ impl DeliveryService {
                 }
             };
 
-            if !Self::is_approved(&slip.match_status) {
+            if !Self::is_approved(&slip) {
                 skipped += 1;
                 continue;
             }
@@ -642,6 +639,29 @@ impl DeliveryService {
         let settings_repo = crate::database::repositories::SettingsRepository::new();
         let email_cfg = settings_repo.get_email_config(conn).unwrap_or_default();
         let wa_cfg = settings_repo.get_whatsapp_config(conn).unwrap_or_default();
+        let next_attempt = rec.attempt_number + 1;
+        let new_rec_id = simple_id("del");
+
+        let new_rec = DeliveryRecord {
+            id: new_rec_id.clone(),
+            salary_slip_id: rec.salary_slip_id.clone(),
+            employee_id: rec.employee_id.clone(),
+            channel: rec.channel.clone(),
+            status: "PROCESSING".to_string(),
+            recipient: rec.recipient.clone(),
+            provider: rec.provider.clone(),
+            message: rec.message.clone(),
+            error_code: None,
+            error_message: None,
+            provider_message_id: None,
+            attempt_number: next_attempt,
+            created_at: now_str.clone(),
+            started_at: Some(now_str.clone()),
+            completed_at: None,
+            employee_name: rec.employee_name.clone(),
+        };
+
+        self.delivery_repo.create_record(conn, &new_rec)?;
 
         if rec.channel == "EMAIL" {
             let host = if !email_cfg.host.is_empty() { &email_cfg.host } else { "mail.company.com" };
@@ -664,28 +684,29 @@ impl DeliveryService {
                 &slip.file_path,
             );
 
+            let comp = current_timestamp();
             match res {
                 Ok(msg_id) => {
                     self.delivery_repo.update_status(
                         conn,
-                        &rec.id,
+                        &new_rec_id,
                         "SENT",
                         Some(&msg_id),
                         None,
                         None,
-                        Some(&now_str),
+                        Some(&comp),
                     )?;
                 }
                 Err(err) => {
                     let err_msg = err.to_string();
                     self.delivery_repo.update_status(
                         conn,
-                        &rec.id,
+                        &new_rec_id,
                         "FAILED",
                         None,
                         Some("RETRY_FAILED"),
                         Some(&err_msg),
-                        Some(&now_str),
+                        Some(&comp),
                     )?;
                 }
             }
@@ -703,34 +724,35 @@ impl DeliveryService {
                 rec.message.as_deref().unwrap_or(""),
             );
 
+            let comp = current_timestamp();
             match res {
                 Ok(msg_id) => {
                     self.delivery_repo.update_status(
                         conn,
-                        &rec.id,
+                        &new_rec_id,
                         "SENT",
                         Some(&msg_id),
                         None,
                         None,
-                        Some(&now_str),
+                        Some(&comp),
                     )?;
                 }
                 Err(err) => {
                     let err_msg = err.to_string();
                     self.delivery_repo.update_status(
                         conn,
-                        &rec.id,
+                        &new_rec_id,
                         "FAILED",
                         None,
                         Some("RETRY_FAILED"),
                         Some(&err_msg),
-                        Some(&now_str),
+                        Some(&comp),
                     )?;
                 }
             }
         }
 
-        match self.delivery_repo.find_by_id(conn, record_id)? {
+        match self.delivery_repo.find_by_id(conn, &new_rec_id)? {
             Some(updated) => Ok(updated),
             None => Err("Failed to retrieve updated delivery record".to_string()),
         }
@@ -738,5 +760,99 @@ impl DeliveryService {
 
     pub fn get_delivery_records(&self, conn: &Connection) -> Result<Vec<DeliveryRecord>, String> {
         self.delivery_repo.find_all(conn)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::database::connection::DbState;
+    use crate::models::SalarySlip;
+    use rusqlite::Connection;
+
+    #[test]
+    fn test_delivery_approval_gate_enforcement() {
+        let mut unapproved_slip = SalarySlip {
+            id: "slip-test-1".to_string(),
+            file_path: "C:\\dummy\\slip.pdf".to_string(),
+            file_name: "slip.pdf".to_string(),
+            file_hash: "hash123".to_string(),
+            detected_employee_id: Some("EMP001".to_string()),
+            detected_name: Some("Alice".to_string()),
+            detected_phone: None,
+            detected_email: Some("alice@company.com".to_string()),
+            extraction_method: "TEXT_EMBEDDED".to_string(),
+            extracted_text: Some("Salary Slip".to_string()),
+            match_confidence: 1.0,
+            match_status: "EXACT_MATCH".to_string(),
+            duplicate_of_id: None,
+            ocr_confidence: None,
+            ocr_processed_at: None,
+            ocr_error: None,
+            matched_employee_id: Some("EMP001".to_string()),
+            match_reason: None,
+            matched_at: None,
+            reviewed_at: None,
+            reviewed_by: None,
+            review_note: None,
+            month: Some("August".to_string()),
+            year: Some("2026".to_string()),
+            approval_status: "PENDING".to_string(),
+            ocr_status: "NOT_REQUIRED".to_string(),
+            document_type: Some("SALARY_SLIP".to_string()),
+            document_confidence: Some(100.0),
+            ocr_attempt_count: None,
+            ocr_page_count: None,
+            ocr_processing_time_ms: None,
+            created_at: "1000".to_string(),
+            updated_at: "1000".to_string(),
+        };
+
+        // Invariant: EXACT_MATCH with PENDING approval MUST NOT be eligible to send
+        assert!(!DeliveryService::is_approved(&unapproved_slip), "Unapproved slip should NOT pass approval gate");
+
+        // Approved slip MUST pass approval gate
+        unapproved_slip.approval_status = "APPROVED".to_string();
+        assert!(DeliveryService::is_approved(&unapproved_slip), "Approved slip MUST pass approval gate");
+
+        // Manually confirmed slip MUST pass approval gate
+        unapproved_slip.approval_status = "PENDING".to_string();
+        unapproved_slip.match_status = "MANUALLY_CONFIRMED".to_string();
+        assert!(DeliveryService::is_approved(&unapproved_slip), "Manually confirmed slip MUST pass approval gate");
+    }
+
+    #[test]
+    fn test_retry_creates_new_attempt_and_preserves_history() {
+        let conn = Connection::open_in_memory().unwrap();
+        DbState::migrate(&conn).unwrap();
+
+        let repo = DeliveryRepository::new();
+
+        let initial_record = DeliveryRecord {
+            id: "del_attempt_1".to_string(),
+            salary_slip_id: "slip-test".to_string(),
+            employee_id: "emp-test".to_string(),
+            channel: "EMAIL".to_string(),
+            status: "FAILED".to_string(),
+            recipient: "test@example.com".to_string(),
+            provider: "SMTP".to_string(),
+            message: Some("Body".to_string()),
+            error_code: Some("EMAIL_FAILED".to_string()),
+            error_message: Some("Connection refused".to_string()),
+            provider_message_id: None,
+            attempt_number: 1,
+            created_at: "1000".to_string(),
+            started_at: Some("1000".to_string()),
+            completed_at: Some("1001".to_string()),
+            employee_name: Some("Test Employee".to_string()),
+        };
+
+        repo.create_record(&conn, &initial_record).unwrap();
+
+        // Check that attempt 1 exists
+        let records_before = repo.find_all(&conn).unwrap();
+        assert_eq!(records_before.len(), 1);
+        assert_eq!(records_before[0].attempt_number, 1);
+        assert_eq!(records_before[0].status, "FAILED");
     }
 }

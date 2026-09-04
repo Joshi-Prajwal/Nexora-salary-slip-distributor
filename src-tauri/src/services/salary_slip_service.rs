@@ -80,7 +80,6 @@ impl SalarySlipService {
                 let metrics = crate::pdf::quality::TextQualityEvaluator::evaluate(&text);
                 let parsed = self.doc_parser.parse_text(&text)?;
 
-                // Filename intelligence fallback for missing extracted fields
                 let clean_fname = slip.file_name.trim_end_matches(".pdf").trim_end_matches(".PDF");
                 let (fn_code, fn_name) = if let Some((code, name)) = clean_fname.split_once('-') {
                     let c = code.trim().to_string();
@@ -96,7 +95,9 @@ impl SalarySlipService {
                 let emp_id = parsed.employee_id.or(fn_code);
                 let emp_name = parsed.name.or(fn_name);
 
-                let (extraction_method, _ocr_status) = if metrics.is_usable {
+                let classification = crate::pdf::SalarySlipClassifier::classify(&text, &slip.file_name);
+
+                let (extraction_method, ocr_target_status) = if metrics.is_usable {
                     ("TEXT_EMBEDDED", "NOT_REQUIRED")
                 } else {
                     ("OCR_REQUIRED", "PENDING")
@@ -121,7 +122,10 @@ impl SalarySlipService {
                     parsed.phone.as_deref(),
                     parsed.email.as_deref(),
                     extraction_method,
-                    new_status,
+                    Some(new_status),
+                    Some(classification.document_type.as_str()),
+                    Some(classification.confidence),
+                    Some(ocr_target_status),
                 )?;
             }
             Err(_err) => {
@@ -140,7 +144,10 @@ impl SalarySlipService {
                     None,
                     None,
                     "NOT_IDENTIFIED",
-                    new_status,
+                    Some(new_status),
+                    Some("UNKNOWN"),
+                    Some(0.0),
+                    Some("PENDING"),
                 )?;
             }
         }
@@ -204,8 +211,10 @@ impl SalarySlipService {
 
         let _is_duplicate = slip.match_status == "DUPLICATE_CONTENT";
 
+        let start_time = std::time::Instant::now();
         match self.ocr_engine.recognize(&slip.file_path) {
             Ok(ocr_res) => {
+                let duration_ms = start_time.elapsed().as_millis() as u64;
                 let parsed = self.doc_parser.parse_text(&ocr_res.text)?;
 
                 let clean_fname = slip.file_name.trim_end_matches(".pdf").trim_end_matches(".PDF");
@@ -222,6 +231,8 @@ impl SalarySlipService {
 
                 let emp_id = parsed.employee_id.or(fn_code);
                 let emp_name = parsed.name.or(fn_name);
+
+                let classification = crate::pdf::SalarySlipClassifier::classify(&ocr_res.text, &slip.file_name);
 
                 let ocr_status = if ocr_res.confidence >= 70.0 {
                     "COMPLETED"
@@ -241,9 +252,14 @@ impl SalarySlipService {
                     ocr_status,
                     Some(ocr_res.confidence),
                     None,
+                    Some(classification.document_type.as_str()),
+                    Some(classification.confidence),
+                    Some(ocr_res.page_count as u32),
+                    Some(duration_ms),
                 )?;
             }
             Err(ocr_err) => {
+                let duration_ms = start_time.elapsed().as_millis() as u64;
                 let err_msg = ocr_err.to_string();
                 let ocr_status = match &ocr_err {
                     crate::ocr::OcrError::EngineUnavailable(_) => "UNAVAILABLE",
@@ -268,6 +284,10 @@ impl SalarySlipService {
                     ocr_status,
                     None,
                     Some(&err_msg),
+                    None,
+                    None,
+                    None,
+                    Some(duration_ms),
                 )?;
             }
         }
@@ -416,7 +436,10 @@ impl SalarySlipService {
                         slip.detected_phone.as_deref(),
                         slip.detected_email.as_deref(),
                         &slip.extraction_method,
-                        "IDENTIFIED",
+                        Some("IDENTIFIED"),
+                        None,
+                        None,
+                        None,
                     );
                 }
             }
@@ -604,6 +627,11 @@ impl SalarySlipService {
         for id in slip_ids {
             if target_approval == "APPROVED" {
                 if let Some(slip) = self.repo.find_by_id(conn, id)? {
+                    // Safety check: Cannot bulk-approve CONFLICT, NO_MATCH, UNMATCHED, or records with missing employee
+                    if slip.match_status == "CONFLICT" || slip.match_status == "NO_MATCH" || slip.match_status == "UNMATCHED" {
+                        continue;
+                    }
+
                     if let Some(emp_id) = slip.matched_employee_id.as_deref() {
                         self.repo.update_match_decision(
                             conn,
@@ -615,8 +643,6 @@ impl SalarySlipService {
                             Some("Bulk Row Action"),
                             Some("Reviewer"),
                         )?;
-                    } else {
-                        self.repo.update_approval_status(conn, id, "APPROVED", Some("Bulk Approved"), Some("Reviewer"))?;
                     }
                 }
             } else if target_approval == "REJECTED" {

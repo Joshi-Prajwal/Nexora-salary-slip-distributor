@@ -6,6 +6,7 @@ use std::sync::{Arc, Mutex};
 
 pub struct DbState {
     pub conn: Arc<Mutex<Connection>>,
+    pub db_path: String,
 }
 
 fn ensure_column_exists(
@@ -59,6 +60,7 @@ impl DbState {
 
         Ok(Self {
             conn: Arc::new(Mutex::new(conn)),
+            db_path: db_path.to_string(),
         })
     }
 
@@ -78,6 +80,15 @@ impl DbState {
              WHERE status = 'PROCESSING'",
             [&now_str],
         )?;
+
+        // Also recover any OCR tasks stuck in RUNNING state from abnormal termination
+        let _ = conn.execute(
+            "UPDATE salary_slips 
+             SET ocr_status = 'PENDING',
+                 ocr_error = 'OCR processing interrupted by application shutdown. Ready for retry.'
+             WHERE ocr_status = 'RUNNING'",
+            [],
+        );
 
         Ok(())
     }
@@ -126,6 +137,11 @@ impl DbState {
                 year TEXT,
                 approval_status TEXT NOT NULL DEFAULT 'PENDING',
                 ocr_status TEXT NOT NULL DEFAULT 'NOT_REQUIRED',
+                document_type TEXT NOT NULL DEFAULT 'UNKNOWN',
+                document_confidence REAL NOT NULL DEFAULT 0.0,
+                ocr_attempt_count INTEGER NOT NULL DEFAULT 0,
+                ocr_page_count INTEGER NOT NULL DEFAULT 0,
+                ocr_processing_time_ms INTEGER NOT NULL DEFAULT 0,
                 created_at TEXT NOT NULL,
                 updated_at TEXT NOT NULL
             );
@@ -171,6 +187,11 @@ impl DbState {
         ensure_column_exists(conn, "salary_slips", "year", "TEXT")?;
         ensure_column_exists(conn, "salary_slips", "approval_status", "TEXT DEFAULT 'PENDING'")?;
         ensure_column_exists(conn, "salary_slips", "ocr_status", "TEXT DEFAULT 'NOT_REQUIRED'")?;
+        ensure_column_exists(conn, "salary_slips", "document_type", "TEXT DEFAULT 'UNKNOWN'")?;
+        ensure_column_exists(conn, "salary_slips", "document_confidence", "REAL DEFAULT 0.0")?;
+        ensure_column_exists(conn, "salary_slips", "ocr_attempt_count", "INTEGER DEFAULT 0")?;
+        ensure_column_exists(conn, "salary_slips", "ocr_page_count", "INTEGER DEFAULT 0")?;
+        ensure_column_exists(conn, "salary_slips", "ocr_processing_time_ms", "INTEGER DEFAULT 0")?;
         ensure_column_exists(conn, "settings", "key", "TEXT")?;
         ensure_column_exists(conn, "settings", "value", "TEXT")?;
         ensure_column_exists(conn, "settings", "updated_at", "TEXT")?;

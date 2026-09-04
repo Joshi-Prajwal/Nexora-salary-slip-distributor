@@ -30,6 +30,11 @@ pub struct SalarySlip {
     pub year: Option<String>,
     pub approval_status: String,
     pub ocr_status: String,
+    pub document_type: Option<String>,
+    pub document_confidence: Option<f64>,
+    pub ocr_attempt_count: Option<u32>,
+    pub ocr_page_count: Option<u32>,
+    pub ocr_processing_time_ms: Option<u64>,
     pub created_at: String,
     pub updated_at: String,
 }

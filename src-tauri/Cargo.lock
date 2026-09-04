@@ -2442,7 +2442,7 @@ checksum = "650eef8c711430f1a879fdd01d4745a7deea475becfb90269c06775983bbf086"
 
 [[package]]
 name = "nexora-salary-slip-distributor"
-version = "0.1.0"
+version = "1.0.0"
 dependencies = [
  "image",
  "lettre",

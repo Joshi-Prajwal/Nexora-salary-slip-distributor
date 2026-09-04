@@ -1,6 +1,6 @@
 [package]
 name = "nexora-salary-slip-distributor"
-version = "0.1.0"
+version = "1.0.0"
 description = "Local Salary Slip Distribution Desktop Application"
 authors = ["Nexora Core Team"]
 edition = "2021"

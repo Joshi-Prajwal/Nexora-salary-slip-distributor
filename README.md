@@ -1,184 +1,161 @@
-# Salary Slip Distributor — Local Desktop Application
+# Nexora — Salary Slip Distributor
 
-> A secure, Windows-first desktop application for automated matching and distribution of pre-generated salary-slip PDFs to employees via official WhatsApp Business API and Email providers.
-
----
-
-## 1. Product Purpose
-The **Salary Slip Distributor** is a local desktop application designed for HR and payroll personnel to streamline the delivery of employee salary slips.
-
-### Critical Limitations & Principles
-- **No Salary Calculations**: This application does **NOT** calculate salaries, taxes, allowances, or net pay. Salary calculation is strictly outside the application scope.
-- **No Document Generation**: Salary slips already exist as PDF files created by upstream payroll software.
-- **Authorized WhatsApp API Only**: WhatsApp integration uses official WhatsApp Business API endpoints. Browsers, personal Web automation, or scraping methods are prohibited.
-- **Strict Data Privacy**: Ambiguous employee-to-PDF matches **MUST NOT** be automatically sent. Human review and explicit confirmation are required to protect sensitive employee compensation data.
+**Version 1.0.0 (Production Release)**  
+*Windows-First Desktop Application for Automated Salary Slip Matching and Distribution*
 
 ---
 
-## 2. Core Business Workflow
+## 1. Overview
+**Nexora — Salary Slip Distributor** is an enterprise-grade, privacy-first Windows desktop application engineered for HR and payroll departments. Nexora automates the ingestion, matching, approval, and email delivery of pre-generated salary-slip PDFs to employees with strict human review safeguards, cryptographic credential encryption, and multi-month historical record integrity.
 
-```
-Excel Employee Data
-        ↓
-Local SQLite Database
-        ↓
-Select Salary Slip Folder
-        ↓
-Scan PDF Files
-        ↓
-Extract PDF Text (Primary)
-        ↓
-OCR Engine Fallback (Scanned/Image PDFs)
-        ↓
-Extract Employee ID / Name / Phone / Email
-        ↓
-Signal Matcher with Confidence Score
-        ↓
-Manual HR Review for Ambiguous Matches
-        ↓
-WhatsApp (Business API) / Email (SMTP)
-        ↓
-Background Distribution Queue
-        ↓
-Success / Failure / Audit Log / Retry
-```
+### Core Philosophy & Operational Boundaries
+- **No Salary Computation**: Nexora does **NOT** compute wages, tax withholdings, allowances, deductions, or net payouts. Salary calculation belongs entirely to upstream payroll ERPs.
+- **No PDF Document Generation**: Nexora distributes existing, pre-generated salary-slip PDFs.
+- **Strict Approval Gate**: Automated matching computes confidence scores but **never** automatically authorizes dispatch. Human review and explicit confirmation are required to safeguard confidential compensation data.
+- **Zero Document Mutation**: Physical salary-slip PDFs on disk are treated as strictly immutable read-only records. Nexora never alters, renames, or deletes payroll documents.
 
 ---
 
-## 3. Technology Architecture & Stack
-
-### Desktop Shell
-- **Tauri v2**: Windows-first desktop application runtime.
-- **Rust Core Layer**: Multi-threaded file processing, database operations, and system integrations.
-
-### Frontend UI
-- **React 18**: UI rendering.
-- **TypeScript**: Strict type safety.
-- **Vite**: Ultra-fast bundler and hot module replacement (HMR).
-- **Zustand**: Clean, centralized state management.
-- **Tailwind CSS**: Modern desktop UI design system.
-
-### Local Database
-- **SQLite**: Local relational storage for employee records, slip metadata, match mappings, and audit logs.
-
-### Architectural Layering Rule
-The UI layer never contains business logic.
+## 2. System Architecture
 
 ```
-React UI Layer
-      ↓
-Zustand Store Layer
-      ↓
-Application Services
-      ↓
-Domain Layer & Interfaces
-      ↓
-SQLite Repository & External Adapters
+[ Excel Master Import ]             [ Local Salary-Slip Folder ]
+           ↓                                      ↓
+[ SQLite Employee Repository ]       [ Folder Scanner / PDF Parser ]
+           ↓                                      ↓
+           └───────────→ [ Heuristic Matcher ] ←──┘
+                                ↓
+                     [ Match Confidence & Conflicts ]
+                                ↓
+                     [ HR Review & Approval Gate ]
+                                ↓
+                     [ Delivery Preview & Eligibility ]
+                                ↓
+                     [ SMTP Email Dispatch Queue ]
+                                ↓
+                     [ Audit History & Non-Destructive Retry ]
 ```
+
+### Technology Stack
+- **Desktop Runtime**: [Tauri v2](https://v2.tauri.app/) (Windows x64 MSVC)
+- **Backend & Native Core**: Rust (multi-threaded PDF parsing, SQLite database, DPAPI encryption, SMTP transport)
+- **Frontend Layer**: React 18, TypeScript (strict mode), Vite, Zustand, Tailwind CSS
+- **Database Engine**: Embedded SQLite in Write-Ahead Logging (`WAL`) mode with foreign key enforcement
+- **Security Primitives**: Windows Data Protection API (DPAPI) for at-rest secret encryption, automatic credential redaction in logs/errors, and Content Security Policy (`CSP`) isolation.
 
 ---
 
-## 4. Folder Structure
+## 3. Installation & Distribution
 
-```
-Nexora/
-├── README.md
-├── LICENSE
-├── .gitignore
-├── .env.example
-├── package.json
-├── tsconfig.json
-├── vite.config.ts
-├── index.html
-│
-├── src/
-│   ├── app/ (App, routes, providers, config)
-│   ├── components/ (common, layout, feedback, ui)
-│   ├── pages/ (Dashboard, Employees, SalarySlips, Matching, Sending, History, Settings)
-│   ├── features/ (employee-import, pdf-processing, matching, whatsapp, email, bulk-sending, history)
-│   ├── stores/ (appStore, employeeStore, salarySlipStore, matchingStore, sendingStore, historyStore, settingsStore)
-│   ├── services/ (employeeService, salarySlipService, matchingService, sendingService, historyService, settingsService)
-│   ├── types/ (employee, salarySlip, matching, messaging, sending, settings)
-│   ├── utils/ (validation, formatting, file, dates)
-│   ├── styles/ (globals.css)
-│   └── main.tsx
-│
-├── src-tauri/
-│   ├── src/ (main.rs, lib.rs, commands, database, filesystem, pdf, ocr, matching, messaging, queue, models, services, errors, config)
-│   ├── Cargo.toml
-│   ├── tauri.conf.json
-│   └── capabilities/
-│
-├── docs/ (00-Product-Overview.md, 01-Architecture.md, 02-Database-Design.md, 03-Feature-Boundaries.md, 04-Security.md, 05-Development-Roadmap.md)
-├── prompts/ (01-Foundation.md through 12-Packaging.md)
-├── tests/ (unit, integration, fixtures)
-├── scripts/ (dev, test, build, db-init)
-└── assets/
-```
+### Requirements
+- **Operating System**: Windows 10 or Windows 11 (64-bit architecture)
+- **Hardware**: Minimum 4 GB RAM, 200 MB free disk space
+- **Network**: Internet/Intranet connectivity required only for SMTP email dispatch; all core workflows operate 100% offline.
+
+### Installation Instructions
+1. Download the production installer: `Nexora-Setup-1.0.0-x64.exe`.
+2. Run the installer. The application installs under user scope:
+   `%LOCALAPPDATA%\Programs\Nexora\`
+   *(No Administrator elevation is required).*
+3. Launch Nexora from the Start Menu or Desktop shortcut.
+
+> [!NOTE]
+> **Windows SmartScreen Notice**: The v1.0.0 pre-release package is unsigned. When Windows SmartScreen displays the standard "Unknown Publisher" protection dialog, click **"More info"** and select **"Run anyway"** to complete installation.
+
+### Storage & Data Locations
+- **Application Binaries**: `%LOCALAPPDATA%\Programs\Nexora\`
+- **Database & Active State**: `%APPDATA%\com.nexora.distributor\nexora.db`
+- **Automatic Snapshots & Backups**: `%APPDATA%\com.nexora.distributor\backups\`
+
+### Uninstall Behavior
+Uninstalling Nexora via Windows Settings or `Uninstall Nexora.exe` removes application binaries and system shortcuts while **preserving** user data in `%APPDATA%\com.nexora.distributor\`. Historical payroll records, delivery logs, settings, and physical PDFs remain untouched and are instantly recovered upon reinstallation.
 
 ---
 
-## 5. Development Setup & Execution Commands
+## 4. End-to-End Workflow Guide
 
-### Prerequisites
-- **Node.js**: v18+ (Node v22 recommended)
-- **Rust**: 1.75+ (with `cargo` installed)
+### Step 1: Employee Master Import
+- Prepare an Excel workbook (`.xlsx`, `.xls`, or `.csv`) containing employee columns: `Employee ID`, `Name`, `Email`, `Phone`, `Department`, `Designation`.
+- Navigate to **Employees** -> **Import Excel**.
+- Nexora validates email formatting, preserves leading zeros in IDs, and stores records in SQLite.
+- Using **Replace All** safely captures a pre-import snapshot backup with full rollback on validation failure.
 
-### 1. Install Dependencies
+### Step 2: Salary-Slip Folder Ingestion
+- Navigate to **Salary Slips** -> **Scan Folder** or drag-and-drop a folder.
+- Recursive scanner discovers all valid `%PDF-` files, rejecting non-PDF or spoofed files.
+- Embedded text extractor extracts Employee IDs, names, dates, and salary figures.
+- Ingested documents initialize strictly in `PENDING` approval status.
+
+### Step 3: OCR Engine Fallback (Optional)
+- For image-based or scanned PDFs with sparse text, Nexora supports optical character recognition fallback.
+- **Tesseract OCR Status**: Tesseract is an optional system enhancement. If Tesseract is not installed, digital PDF parsing functions at 100% fidelity. If OCR is unavailable on a scanned document, Nexora logs an `ENGINE_ERROR` without corrupting metadata.
+
+### Step 4: Intelligent Matching & Conflict Detection
+- Run the **Matching Engine** across ingested documents.
+- Nexora applies multi-signal matching (exact ID, normalized ID, full name, email prefix).
+- Match outcomes: `EXACT`, `HIGH_CONFIDENCE`, `LOW_CONFIDENCE`, `CONFLICT`, or `UNMATCHED`.
+- **Safety Rule**: High-confidence matching **never** automatically authorizes sending.
+
+### Step 5: HR Review & Explicit Approval
+- Review matched slips on the **Matching & Approval** screen.
+- Verify employee association, month, and year.
+- Click **Approve** individually or use period-scoped **Bulk Approve**.
+- Slips flagged with `CONFLICT` cannot be approved until manually reassigned.
+
+### Step 6: Delivery Preview & Email Dispatch
+- Navigate to **Send Slips**.
+- Select the delivery channel (**Email**) and choose the payroll month.
+- Nexora evaluates delivery eligibility:
+  - Must have valid employee association.
+  - Must be in `APPROVED` or `MANUALLY_CONFIRMED` status.
+  - Recipient email must be valid and non-empty.
+  - Physical PDF must exist on disk.
+  - Must not have already been sent (`already_sent_count` idempotency guard).
+- Click **Send Batch** to queue deliveries.
+
+### Step 7: Delivery Audit Log & Non-Destructive Retry
+- Inspect the **History** tab for complete delivery logs with attempt numbers, status (`SENT` or `FAILED`), and sanitized error details.
+- For any `FAILED` delivery, review the error and click **Retry Delivery**.
+- The retry mechanism re-validates approval and file existence, dispatches attempt #2, and permanently preserves attempt #1 in the database for auditing.
+
+---
+
+## 5. Security & Privacy Architecture
+
+- **Encryption at Rest**: Sensitive SMTP credentials and configuration tokens are encrypted using Windows Data Protection API (DPAPI) with a machine-bound master key (`enc:dpapi:` prefix).
+- **Secret Redaction**: Error logs and diagnostic outputs dynamically mask credentials, authorization headers, and passwords with `[REDACTED]`.
+- **SQL Injection Defense**: 100% of SQLite database queries use parameterized prepared statements.
+- **Immutable Documents**: Physical files on disk are opened read-only. Database operations never execute disk deletions.
+- **WhatsApp Cloud API Status**: WhatsApp integration is intentionally unconfigured in this release. Zero unauthorized network requests or tokens are required.
+
+---
+
+## 6. Build & Verification Commands
+
 ```cmd
+# 1. Install Node dependencies
 npm install
-```
 
-### 2. Run Development Server (Frontend)
-```cmd
-npm run dev
-```
-
-### 3. Run Full Desktop App Development Mode (Tauri + React)
-```cmd
-npm run tauri:dev
-```
-
-### 4. Run TypeScript Compiler & Type Check
-```cmd
+# 2. Run TypeScript compiler check
 npx tsc --noEmit
-```
 
-### 5. Run Automated Tests
-```cmd
-npm run test
-```
+# 3. Execute Vitest test suite (110 unit tests)
+npm test -- --run
 
-### 6. Build Production Desktop Application
-```cmd
-npm run build
-```
+# 4. Execute Rust cargo test suite (83 unit & integration tests)
+cargo test --manifest-path src-tauri/Cargo.toml
 
-### 7. Run Cargo Static Rust Diagnostics Check
-```cmd
+# 5. Execute Rust static check
 cargo check --manifest-path src-tauri/Cargo.toml
+
+# 6. Build production frontend
+npm run build
+
+# 7. Package production Windows x64 NSIS installer
+npx tauri build
 ```
 
 ---
 
-## 6. Phase Roadmap
-
-- [x] **Phase 0**: Project Foundation, Architecture & Complete Folder Structure
-- [ ] **Phase 1**: Excel Employee Import Module
-- [ ] **Phase 2**: Salary Slip Directory Scanner Module
-- [ ] **Phase 3**: Embedded PDF Text Extraction Engine
-- [ ] **Phase 4**: Fallback OCR Engine
-- [ ] **Phase 5**: Employee Matching Engine
-- [ ] **Phase 6**: Manual Review & Confirmation UI
-- [ ] **Phase 7**: SMTP Email Integration
-- [ ] **Phase 8**: Official WhatsApp Business API Integration
-- [ ] **Phase 9**: Bulk Sending Queue & Worker System
-- [ ] **Phase 10**: History Audit Log & Retry Mechanism
-- [ ] **Phase 11**: Automated Testing & Validation
-- [ ] **Phase 12**: Packaging & Windows Installer Setup
-
----
-
-## 7. Security Principles
-- Employee documents and personal information never leave the local environment unless explicitly queued for sending.
-- Credentials and provider secrets are stored securely in local database/configuration settings and are redacted in error messages.
+## 7. License & Copyright
+Copyright © 2026 Nexora Team. All rights reserved.

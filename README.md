@@ -4,8 +4,6 @@
 
 > A modern Windows desktop application for managing, matching, approving, and distributing salary-slip documents.
 
-<img width="1920" height="1032" alt="Screenshot 2026-09-05 060439" src="https://github.com/user-attachments/assets/8aeaed4c-c7d2-4c58-949b-09ca6d84f43f" />
-
 ## Overview
 
 Nexora is a Windows-first application built for HR and payroll teams to simplify the operational workflow around existing salary-slip documents.
@@ -189,7 +187,8 @@ Track salary-slip delivery activity from a single interface.
 
 The dashboard provides a quick view of the salary-slip distribution workflow.
 
-![Nexora Dashboard](assets/nexora-dashboard.png)
+<img width="1920" height="1032" alt="Screenshot 2026-09-05 060439" src="https://github.com/user-attachments/assets/1bd3cda9-76a5-4719-a071-973f7c66b248" />
+
 
 Typical areas include:
 
@@ -205,8 +204,6 @@ Typical areas include:
 ## Architecture
 
 Nexora uses a modern desktop architecture built around Tauri, React, Rust, and SQLite.
-
-![Nexora Architecture](assets/nexora-architecture.png)
 
 ```text
 ┌─────────────────────────────────────────────┐
@@ -246,24 +243,6 @@ Nexora uses a modern desktop architecture built around Tauri, React, Rust, and S
 | PDF Processing | PDF text extraction |
 | OCR | Tesseract fallback |
 | Platform | Windows 10/11 x64 |
-
----
-
-## Application Screens
-
-### Employee Management
-
-![Employee Management](assets/nexora-employees.png)
-
-### Matching & Approval
-
-![Matching and Approval](assets/nexora-matching.png)
-
-### Delivery History
-
-![Delivery History](assets/nexora-history.png)
-
-> Detailed UI instructions are available in [`USER_GUIDE.md`](USER_GUIDE.md).
 
 ---
 
